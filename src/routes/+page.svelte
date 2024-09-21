@@ -41,13 +41,13 @@
 
 <!-- Home page content -->
 {#if !user}
-  <h1>Home</h1>
-  <p>This page works as follows: you create a route, and you earn money.</p>
+  <h1>Complete quests and get a discount and learn a language</h1>
+  <p>This page works as follows: you create a route, and if it gets taken by 100 you get rid of adds</p>
+  <p>graphics: picture of monument</p>
 {/if}
 
 <!-- If the user is logged in, show a welcome message -->
 {#if user}
-  <h1>Welcome, {user.name}!</h1>
-   <!-- Monument Finder component for logged-in users -->
+
    <MonumentFinder />
 {/if}

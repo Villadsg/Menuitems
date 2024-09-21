@@ -17,7 +17,7 @@
     };
   </script>
   
-  <h2 class="text-2xl font-bold mb-4">Something interesting</h2>
+  <h2 class="text-2xl font-bold mb-4">Login</h2>
   <form on:submit|preventDefault={login} class="space-y-4 max-w-md mx-auto">
     <div>
       <Label for="email">Email</Label>
