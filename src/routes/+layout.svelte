@@ -1,42 +1,40 @@
 <script lang="ts">
+    import '../app.css'; // Import Tailwind CSS
     import { user, checkUser, logoutUser } from '$lib/userStore';
     import { onMount } from 'svelte';
+    import { Navbar, NavBrand, NavHamburger, NavUl, NavLi } from 'flowbite-svelte';
   
-    // On component mount, check if the user is logged in
     onMount(() => {
       checkUser();
     });
   
     const logout = async () => {
       try {
-        await logoutUser(); // Use the store logout function
+        await logoutUser();
       } catch (error) {
         console.error('Logout failed:', error.message);
       }
     };
-  </script>
-  
-  <!-- Navbar for logged-in users -->
-  {#if $user}
-    <nav>
-      <ul>
-        <li><a href="/">Home</a></li>
-        <li><a href="/profile">Profile</a></li>
-        <li><a href="/create-quiz">Create Quiz</a></li>
-        <li><button on:click={logout}>Logout</button></li>
-      </ul>
-    </nav>
-  {/if}
-  
-  <!-- Navbar for non-logged-in users -->
-  {#if !$user}
-    <nav>
-      <ul>
-        <li><a href="/">Home</a></li>
-        <li><a href="/login">Login</a></li>
-      </ul>
-    </nav>
-  {/if}
-  
-  <slot></slot> <!-- This will render the content of each page -->
-  
+</script>
+
+<Navbar>
+  <NavBrand href="/">
+    <img src="../src/components/Designer.png" class="me-3 h-6 sm:h-9" alt="Logo" />
+    <span class="self-center whitespace-nowrap text-xl font-semibold dark:text-white">Langtours</span>
+  </NavBrand>
+
+  <NavHamburger />
+
+  <NavUl>
+    {#if $user}
+    <NavLi href="/create-quiz">Create Quiz</NavLi>
+      <NavLi href="/profile">Profile</NavLi>
+      <NavLi as="button" on:click={logout}>Logout</NavLi>
+    {:else}
+      <NavLi href="/login">Login</NavLi>
+      <NavLi href="/signup">Sign Up</NavLi>
+    {/if}
+  </NavUl>
+</Navbar>
+
+<slot></slot>

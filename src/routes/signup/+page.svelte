@@ -2,24 +2,31 @@
   import { account } from '$lib/appwrite';
   import { goto } from '$app/navigation';
   import { ID } from 'appwrite';
+  import { Label, Button } from 'flowbite-svelte';
 
   let email = '';
   let password = '';
 
   const signup = async () => {
     try {
-      const response = await account.create(ID.unique(), email, password); // Create user
-      alert('Signup successful! Please check your email to verify your account.'); // Inline message
+      await account.create(ID.unique(), email, password);
+      alert('Signup successful! Please check your email to verify your account.');
     } catch (error) {
       console.error('Signup error:', error.message);
-      alert('Signup failed: ' + error.message); // Inline error message
+      alert('Signup failed: ' + error.message);
     }
   };
 </script>
 
-<h1>Sign Up</h1>
-<form on:submit|preventDefault={signup}>
-  <input type="email" bind:value={email} placeholder="Email" required />
-  <input type="password" bind:value={password} placeholder="Password" required />
-  <button type="submit">Sign Up</button>
+<h1 class="text-2xl font-bold mb-4">Sign Up</h1>
+<form on:submit|preventDefault={signup} class="space-y-4 max-w-md mx-auto">
+  <div>
+    <Label for="email">Email</Label>
+    <input id="email" type="email" bind:value={email} required class="w-full p-2 border border-gray-300 rounded-lg" />
+  </div>
+  <div>
+    <Label for="password">Password</Label>
+    <input id="password" type="password" bind:value={password} required class="w-full p-2 border border-gray-300 rounded-lg" />
+  </div>
+  <Button type="submit" class="w-full bg-blue-500 text-white px-4 py-2 rounded-lg">Sign Up</Button>
 </form>
