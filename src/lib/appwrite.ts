@@ -1,5 +1,5 @@
 
-import { Client, Account } from 'appwrite';
+import { Client, Account, Databases } from 'appwrite';
 
 // Initialize Appwrite client
 const client = new Client();
@@ -10,3 +10,4 @@ client
 
 // Export account instance for authentication
 export const account = new Account(client);
+export const databases = new Databases(client);
