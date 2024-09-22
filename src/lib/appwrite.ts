@@ -1,6 +1,5 @@
 
-import { Client, Account, Databases } from 'appwrite';
-
+import { Client, Account, Databases, Storage, ID, Permission, Role  } from 'appwrite';
 // Initialize Appwrite client
 const client = new Client();
 
@@ -9,5 +8,7 @@ client
   .setProject('6609304dced645ab3eaf'); // Replace with your Appwrite Project ID
 
 // Export account instance for authentication
-export const account = new Account(client);
-export const databases = new Databases(client);
+const account = new Account(client);
+const databases = new Databases(client);
+const storage = new Storage(client);
+export {account,databases,storage, ID, Permission, Role };
