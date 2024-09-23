@@ -11,19 +11,20 @@
     
     let monuments = [];
   
-    // Function to load monuments from Appwrite Database
     const loadMonuments = async () => {
-      try {
-        const response = await databases.listDocuments(databaseId, collectionId);
-        monuments = response.documents.map(doc => ({
-          name: doc.Route_name,
-          lat: doc.lat,  // Ensure latitude and longitude are in your database
-          lng: doc.lng
-        }));
-      } catch (error) {
-        console.error("Error loading monuments:", error);
-      }
-    };
+  try {
+    const response = await databases.listDocuments(databaseId, collectionId);
+    monuments = response.documents.map(doc => ({
+      name: doc.Route_name,
+      lat: doc.lat,
+      lng: doc.lng,
+      photoFileId: doc.photoFileId // Include the photoFileId
+    }));
+  } catch (error) {
+    console.error("Error loading monuments:", error);
+  }
+};
+
   
     // Calculate distance between two coordinates using the Haversine formula
     function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {

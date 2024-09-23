@@ -41,9 +41,19 @@
 
 <!-- Home page content -->
 {#if !user}
-  <h1>Complete quests and get a discount and learn a language</h1>
-  <p>This page works as follows: you create a route, and if it gets taken by 100 you get rid of adds</p>
-  <p>graphics: picture of monument</p>
+
+  <!-- Background image section using Tailwind CSS -->
+<div class="bg-cover bg-center bg-no-repeat h-screen" style="background-image: url('/src/components/back.jpeg')">
+  <div class="flex items-center justify-center h-full bg-black bg-opacity-50">
+    <div class="text-center text-white p-4">
+      <h1 class="text-4xl font-bold">Complete quests and learn a language</h1>
+      <p class="mt-4">And gain points and vouchers for local shops </p>
+      <p class="mt-4">Create routes and become a quest designer </p>
+    </div>
+  </div>
+</div>
+
+
 {/if}
 
 <!-- If the user is logged in, show a welcome message -->

@@ -98,7 +98,7 @@
     <!-- New file input for photo -->
     <div>
       <Label for="photo">Upload Photo</Label>
-      <input id="photo" type="file" bind:this={files} accept="image/*" class="w-full p-2 border border-gray-300 rounded-lg" />
+      <input id="photo" type="file" bind:files={files} accept="image/*" class="w-full p-2 border border-gray-300 rounded-lg" />
     </div>
   
     <!-- Button to fill coordinates with current location -->
