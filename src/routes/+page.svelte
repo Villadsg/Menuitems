@@ -43,21 +43,21 @@
 {#if !user}
 
   <!-- Background image section using Tailwind CSS -->
-<div class="bg-cover bg-center bg-no-repeat h-[110vh]" style="background-image: url('/back.jpeg')">
-  <div class="flex items-center justify-center h-full bg-black bg-opacity-50">
-    <div class="text-center text-white p-4'">
-      <h1 class="text-4xl font-bold">Complete tours and learn a language</h1>
-      <p class="mt-4">And gain points and vouchers for local shops </p>
-      <p class="mt-4">Create routes and become a tour designer </p>
-      <a href="/TryRoute">
-        <button class="mt-8 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
-          Try a route
-        </button>
-      </a>
+  <div class="bg-cover bg-center bg-no-repeat h-[150vh]" style="background-image: url('/back.jpeg')">
+    <div class="flex items-start justify-center h-full bg-black bg-opacity-50 pt-40">
+      <div class="text-center text-white p-4'">
+        <h1 class="text-4xl font-bold">Complete tours and learn a language</h1>
+        <p class="mt-4">And gain points and vouchers for local shops</p>
+        <p class="mt-4">Create routes and become a tour designer</p>
+        <a href="/TryRoute">
+          <button class="mt-8 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+            Try a route
+          </button>
+        </a>
+      </div>
     </div>
   </div>
-</div>
-
+  
 
 {/if}
 
