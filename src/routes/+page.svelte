@@ -43,7 +43,7 @@
 {#if !user}
 
   <!-- Background image section using Tailwind CSS -->
-<div class="bg-cover bg-center bg-no-repeat h-[120vh]" style="background-image: url('/back.jpeg')">
+<div class="bg-cover bg-center bg-no-repeat h-[110vh]" style="background-image: url('/back.jpeg')">
   <div class="flex items-center justify-center h-full bg-black bg-opacity-50">
     <div class="text-center text-white p-4'">
       <h1 class="text-4xl font-bold">Complete tours and learn a language</h1>
