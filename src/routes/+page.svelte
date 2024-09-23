@@ -43,7 +43,7 @@
 {#if !user}
 
   <!-- Background image section using Tailwind CSS -->
-<div class="bg-cover bg-center bg-no-repeat h-screen" style="background-image: url('/src/components/back.jpeg')">
+<div class="bg-cover bg-center bg-no-repeat h-screen" style="background-image: url('/back.jpeg')">
   <div class="flex items-center justify-center h-full bg-black bg-opacity-50">
     <div class="text-center text-white p-4">
       <h1 class="text-4xl font-bold">Complete quests and learn a language</h1>
