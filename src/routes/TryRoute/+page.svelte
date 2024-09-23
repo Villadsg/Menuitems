@@ -11,7 +11,7 @@
 
   const translations = {
     english: {
-      title: 'Tryout Route Challenge',
+      title: 'Route Challenge',
       step1Title: 'Step 1: Go to your window and select what you see.',
       multipleChoice: 'Multiple choice:',
       choices: {
@@ -24,7 +24,7 @@
       yourShoesAreOld: 'Your shoes are old!',
     },
     spanish: {
-      title: 'Desafío de Ruta de Prueba',
+      title: 'Ruta de Prueba',
       step1Title: 'Paso 1: Ve a tu ventana y selecciona lo que ves.',
       multipleChoice: 'Elección múltiple:',
       choices: {
@@ -37,7 +37,7 @@
       yourShoesAreOld: '¡Tus zapatos son viejos!',
     },
     italian: {
-      title: 'Sfida del Percorso di Prova',
+      title: 'Percorso di Prova',
       step1Title: 'Passo 1: Vai alla tua finestra e seleziona ciò che vedi.',
       multipleChoice: 'Scelta multipla:',
       choices: {
