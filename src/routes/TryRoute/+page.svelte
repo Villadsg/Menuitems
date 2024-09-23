@@ -22,7 +22,6 @@
       },
       step2Title: 'Step 2: Now grab one of your shoes and take a picture of the shoe.',
       yourShoesAreOld: 'Your shoes are old!',
-      heresThePhoto: 'Here’s the photo you uploaded:',
     },
     spanish: {
       title: 'Desafío de Ruta de Prueba',
@@ -36,7 +35,6 @@
       },
       step2Title: 'Paso 2: Ahora agarra uno de tus zapatos y toma una foto del zapato.',
       yourShoesAreOld: '¡Tus zapatos son viejos!',
-      heresThePhoto: 'Aquí está la foto que subiste:',
     },
     italian: {
       title: 'Sfida del Percorso di Prova',
@@ -50,7 +48,6 @@
       },
       step2Title: 'Passo 2: Ora prendi una delle tue scarpe e fai una foto della scarpa.',
       yourShoesAreOld: 'Le tue scarpe sono vecchie!',
-      heresThePhoto: 'Ecco la foto che hai caricato:',
     },
     japanese: {
       title: 'トライアウトルートチャレンジ',
@@ -64,7 +61,6 @@
       },
       step2Title: 'ステップ2：今すぐ靴の一つを手に取り、その写真を撮ってください。',
       yourShoesAreOld: 'あなたの靴は古いです！',
-      heresThePhoto: 'アップロードした写真はこちらです：',
     },
     danish: {
       title: 'Prøvetursudfordring',
@@ -78,7 +74,6 @@
       },
       step2Title: 'Trin 2: Tag nu en af dine sko og tag et billede af skoen.',
       yourShoesAreOld: 'Dine sko er gamle!',
-      heresThePhoto: 'Her er det foto, du uploadede:',
     },
   };
 </script>
@@ -142,7 +137,6 @@
     <div class="mt-8 bg-gray-100 p-4 rounded-lg">
       <h2 class="text-xl font-bold">{translations[selectedLanguage].yourShoesAreOld}</h2>
       {#if photo}
-        <p class="mt-2">{translations[selectedLanguage].heresThePhoto}</p>
         <img src={URL.createObjectURL(photo)} alt="Uploaded Shoe" class="mt-4 max-w-xs" />
       {/if}
     </div>

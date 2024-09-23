@@ -43,9 +43,9 @@
 {#if !user}
 
   <!-- Background image section using Tailwind CSS -->
-<div class="bg-cover bg-center bg-no-repeat h-screen" style="background-image: url('/back.jpeg')">
+<div class="bg-cover bg-center bg-no-repeat h-[120vh]" style="background-image: url('/back.jpeg')">
   <div class="flex items-center justify-center h-full bg-black bg-opacity-50">
-    <div class="text-center text-white p-4">
+    <div class="text-center text-white p-4'">
       <h1 class="text-4xl font-bold">Complete tours and learn a language</h1>
       <p class="mt-4">And gain points and vouchers for local shops </p>
       <p class="mt-4">Create routes and become a tour designer </p>
