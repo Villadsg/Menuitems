@@ -17,9 +17,9 @@
     };
 </script>
 
-<Navbar class="bg-transparent fixed top-0 left-0 w-full z-50">
+<Navbar class="bg-transparent fixed top-0 left-0">
 
-  <div class="text-center text-white p-4" style="text-shadow: 1px 1px 2px black;">
+  <div class="text-center text-white" style="text-shadow: 1px 1px 2px black;">
 
   <NavBrand href="/">
     <img src="/logotime.png" class="me-1 h-12 w-12" alt="Logo" />
