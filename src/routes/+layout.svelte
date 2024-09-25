@@ -18,12 +18,18 @@
 </script>
 
 <Navbar class="bg-transparent fixed top-0 left-0 w-full z-50">
+
+  <div class="text-center text-white p-4" style="text-shadow: 1px 1px 2px black;">
+
   <NavBrand href="/">
-    <img src="/Designer.png" class="me-3 h-6 sm:h-9" alt="Logo" />
+    <img src="/logotime.png" class="me-1 h-12 w-12" alt="Logo" />
     <span class="self-center whitespace-nowrap text-xl font-semibold dark:text-white">Langtours</span>
   </NavBrand>
 
+</div>
   <NavHamburger />
+
+
 
   <NavUl>
     {#if $user}
@@ -35,6 +41,10 @@
       <NavLi href="/signup">Sign Up</NavLi>
     {/if}
   </NavUl>
+
+
+
 </Navbar>
+
 
 <slot></slot>

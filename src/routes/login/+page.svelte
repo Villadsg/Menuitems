@@ -17,8 +17,7 @@
     };
   </script>
   
-  <h2 class="text-2xl font-bold mb-4">Login</h2>
-  <form on:submit|preventDefault={login} class="space-y-4 max-w-md mx-auto">
+  <form on:submit|preventDefault={login} class="space-y-4 max-w-md mx-auto pt-40">
     <div>
       <Label for="email">Email</Label>
       <input id="email" type="email" bind:value={email} required class="w-full p-2 border border-gray-300 rounded-lg" />

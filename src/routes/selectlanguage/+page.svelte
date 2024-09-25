@@ -9,7 +9,7 @@
       goto('/TryRoute'); // Redirect to TryRoute
     };
   </script>
-  
+  <div class="flex items-start justify-center h-full bg-opacity-50 pt-40">
   <div class="max-w-xl mx-auto p-8">
     <h1 class="text-2xl font-bold mb-4">Which language are you learning?</h1>
     
@@ -23,9 +23,9 @@
         <option value="danish">Danish</option>
       </select>
     </div>
-  
+    
     <button on:click={submitLanguage} class="px-4 py-2 bg-blue-500 text-white rounded">
       Continue
     </button>
   </div>
-  
+</div>

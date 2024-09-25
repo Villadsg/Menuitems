@@ -18,8 +18,8 @@
   };
 </script>
 
-<h1 class="text-2xl font-bold mb-4">Sign Up</h1>
-<form on:submit|preventDefault={signup} class="space-y-4 max-w-md mx-auto">
+
+<form on:submit|preventDefault={signup} class="space-y-4 max-w-md mx-auto pt-40">
   <div>
     <Label for="email">Email</Label>
     <input id="email" type="email" bind:value={email} required class="w-full p-2 border border-gray-300 rounded-lg" />

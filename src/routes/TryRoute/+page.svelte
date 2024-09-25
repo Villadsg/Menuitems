@@ -113,7 +113,7 @@ import { selectedLanguage } from '$lib/languageStore';
 
 
 
-<div class="max-w-3xl mx-auto p-8">
+<div class="max-w-3xl mx-auto p-8  pt-40">
   <!-- Language Selection Dropdown -->
   <div class="mb-6">
     <label for="language" class="font-bold">Select Language:</label>
