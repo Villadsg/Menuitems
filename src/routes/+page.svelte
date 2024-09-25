@@ -49,7 +49,7 @@
         <h1 class="text-4xl font-bold">Complete tours and learn a language</h1>
         <p class="mt-4">And gain points and vouchers for local shops</p>
         <p class="mt-4">Create routes and become a tour designer</p>
-        <a href="/TryRoute">
+        <a href="/selectlanguage">
           <button class="mt-8 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
             Try a route
           </button>
