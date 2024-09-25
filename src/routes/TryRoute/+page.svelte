@@ -8,7 +8,7 @@ import { selectedLanguage } from '$lib/languageStore';
   let showPhotoResult = false;
   let points = 0;
   let showResult = false;
-
+  let fileInput;
   // Subscribe to the language store to get the initially selected language
   $: selectedLanguage.subscribe(value => {
     language = value;
@@ -23,6 +23,10 @@ import { selectedLanguage } from '$lib/languageStore';
     photo = event.target.files[0];
     showPhotoResult = true;
   };
+
+  function openCamera() {
+    fileInput.click();
+  }
 
   const handleSubmit = () => {
     if (answer === '') {
@@ -126,9 +130,16 @@ import { selectedLanguage } from '$lib/languageStore';
   <!-- The rest of your page using the selected language -->
   <h1 class="text-3xl font-bold mb-6">{translations[language].title}</h1>
 
+
+  
   <div class="mb-8">
     <h2 class="text-xl font-bold">{translations[language].step1Title}</h2>
-    <input type="file" accept="image/*" capture="camera" on:change={handleFileUpload} class="mt-4" />
+    <!-- Hidden file input -->
+    <input type="file" accept="image/*" capture="environment" on:change={handleFileUpload} class="hidden" bind:this={fileInput} />
+    <!-- Custom button -->
+    <button type="button" on:click={openCamera} class="px-4 py-2 bg-blue-500 text-white rounded mt-4">
+      Take Photo
+    </button>
   </div>
 
   {#if showPhotoResult}
@@ -177,7 +188,7 @@ import { selectedLanguage } from '$lib/languageStore';
   </div>
 
   <button on:click={handleSubmit} class="px-4 py-2 bg-blue-500 text-white rounded">
-    Submit
+    Get Score
   </button>
 
   {#if showResult}
