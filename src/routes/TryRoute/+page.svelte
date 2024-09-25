@@ -120,6 +120,7 @@ import { selectedLanguage } from '$lib/languageStore';
       <option value="japanese">Japanese</option>
       <option value="danish">Danish</option>
     </select>
+    <p>Changing to another language affects the score negatively</p>
   </div>
 
   <!-- The rest of your page using the selected language -->
