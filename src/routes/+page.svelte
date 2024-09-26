@@ -61,17 +61,19 @@
         </div>
       </div>
     </div>
+
+    <Footer class="bg-transparent">
+      <div class="sm:flex sm:items-center sm:justify-between">
+      <FooterCopyright href="/" by="Langtour™" year={2024} />
+      <FooterLinkGroup ulClass="flex flex-wrap items-center mt-3 text-sm text-gray-500 dark:text-gray-400 sm:mt-0">
+        <FooterLink href="/about">About</FooterLink>
+      </FooterLinkGroup>
+      </div>
+    </Footer>
+
   {/if}
 
 
-  <Footer class="bg-transparent">
-    <div class="sm:flex sm:items-center sm:justify-between">
-    <FooterCopyright href="/" by="Langtour™" year={2024} />
-    <FooterLinkGroup ulClass="flex flex-wrap items-center mt-3 text-sm text-gray-500 dark:text-gray-400 sm:mt-0">
-      <FooterLink href="/about">About</FooterLink>
-    </FooterLinkGroup>
-    </div>
-  </Footer>
 
 {:catch error}
   <div>Error loading user status: {error.message}</div>
