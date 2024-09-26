@@ -4,23 +4,21 @@
 
   let email = '';
   let password = '';
-  let user = null;
 
   // Check if user is already logged in but do not redirect
   const checkUser = async () => {
     try {
-      user = await account.get();
+      return await account.get();
     } catch (error) {
-      console.log('Not logged in');
+      return null;
     }
   };
 
-  checkUser();
 
   const login = async () => {
     try {
       await account.createEmailPasswordSession(email, password);
-      checkUser(); // Refresh the user state
+      await checkUser(); // Refresh the user state
     } catch (error) {
       console.error('Login error:', error.message);
       alert('Login failed: ' + error.message);
@@ -30,7 +28,6 @@
   const logout = async () => {
     try {
       await account.deleteSession('current');
-      user = null; // Reset user state after logging out
     } catch (error) {
       console.error('Logout failed:', error.message);
       alert('Logout failed: ' + error.message);
@@ -40,7 +37,7 @@
 
 
 <!-- Home page content -->
-{#if !user}
+{#if !checkUser()}
 
   <!-- Background image section using Tailwind CSS -->
   <div class="bg-cover bg-center bg-no-repeat h-[140vh]" style="background-image: url('/back.jpeg')">
@@ -58,11 +55,9 @@
     </div>
   </div>
   
-
+  {:else}
+    <div class=" pt-20">
+  <MonumentFinder />
+  </div>
 {/if}
 
-<!-- If the user is logged in, show a welcome message -->
-{#if user}
-
-   <MonumentFinder />
-{/if}

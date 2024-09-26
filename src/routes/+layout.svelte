@@ -35,7 +35,7 @@
     {#if $user}
     <NavLi href="/create-quiz">Create Quiz</NavLi>
       <NavLi href="/profile">Profile</NavLi>
-      <NavLi as="button" on:click={logout}>Logout</NavLi>
+      <NavLi on:click={logout} style="cursor: pointer;">Logout</NavLi>
     {:else}
       <NavLi href="/login">Login</NavLi>
       <NavLi href="/signup">Sign Up</NavLi>

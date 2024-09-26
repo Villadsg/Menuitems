@@ -31,7 +31,7 @@
         );
         monuments = response.documents;
         if (monuments.length === 0) {
-          message = 'No monuments created yet.';
+          message = 'No monument tours created yet.';
         } else {
           message = '';
         }
@@ -94,7 +94,8 @@
     });
   </script>
   
-  <h1 class="text-2xl font-bold mb-6">Your Monuments</h1>
+<div class="pt-20 max-w-md mx-auto">
+  <h1 class="text-2xl font-bold mb-4 space-y-4 max-w-md mx-auto">My Tours</h1>
   <p class="text-red-500">{message}</p>
   
   {#if isEditing}
@@ -147,6 +148,7 @@
   {/if}
   
   <ul>
+  
     {#each monuments as monument (monument.$id)}
       <li class="mb-4 p-4 bg-gray-100 rounded shadow">
         <h3 class="text-xl font-semibold">{monument.Route_name}</h3>
@@ -167,4 +169,4 @@
       </li>
     {/each}
   </ul>
-  
+</div>
