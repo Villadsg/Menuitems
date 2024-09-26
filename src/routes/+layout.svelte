@@ -3,16 +3,22 @@
     import { user, checkUser, logoutUser } from '$lib/userStore';
     import { onMount } from 'svelte';
     import { Navbar, NavBrand, NavHamburger, NavUl, NavLi } from 'flowbite-svelte';
-  
+    import { account } from '$lib/appwrite';
+	  import { goto } from '$app/navigation';
+   
+
     onMount(() => {
       checkUser();
     });
   
     const logout = async () => {
       try {
-        await logoutUser();
+        await account.deleteSession('current'); // Log out the current session
+        user.set(null); // Set user to null after logging out
+        goto("/logout")
       } catch (error) {
         console.error('Logout failed:', error.message);
+        alert('Logout failed: ' + error.message);
       }
     };
 </script>
@@ -47,4 +53,7 @@
 </Navbar>
 
 
+
+
 <slot></slot>
+
