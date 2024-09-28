@@ -12,12 +12,13 @@
   let lng = '';
   let question = "";
   let answers = ["", "", "", ""]; // array to store up to 4 choices
+  let correctAnswer = ""; // Field to store the correct answer
   let message = '';
 
   let showQuestionSection = false;
 
   const addChoice = (index, event) => {
-      answers[index] = event.target.value;
+    answers[index] = event.target.value;
   };
 
   const nextPage = () => {
@@ -48,28 +49,27 @@
         fileId = response.$id;
       }
 
-      // Create the monument document (include photoFileId only if a file was uploaded)
+      // Store the quiz question, answers, and correct answer in quiz_question_answer attribute
       const documentData = {
         Route_name: routeName,
         lat: parseFloat(lat),
         lng: parseFloat(lng),
         quiz_question_answer: [
                 question,
-                ...answers.filter(answer => answer.trim() !== "") // Exclude empty answers
+                ...answers.filter(answer => answer.trim() !== ""), // Exclude empty answers
+                correctAnswer  // Include the correct answer
             ],
         userId: userId,
         ...(fileId && { photoFileId: fileId }) // Add photoFileId only if fileId exists
       };
       
       await databases.createDocument(databaseId, collectionId, ID.unique(), documentData);
-      message = 'Monument created successfully!';
+      message = 'Monument and quiz created successfully!';
       goto('/');
     } catch (error) {
-      message = `Failed to create monument. Error: ${error.message}`;
+      message = `Failed to create monument and quiz. Error: ${error.message}`;
     }
   };
-  
-
   
   let loading = false;
   let files = null;  // New files variable for file input
@@ -106,7 +106,7 @@
 <!-- First Section (Monument Form) -->
 {#if !showQuestionSection}
 <div transition:fly={{x: 200, duration: 300}} class="space-y-4 max-w-md mx-auto">
-  <h1 class="text-2xl font-bold mb-4 space-y-4 max-w-md mx-auto">Create Tour Challenge</h1>
+  <h1 class="text-2xl font-bold mb-4">Create Tour Challenge</h1>
   <form on:submit|preventDefault={nextPage} class="space-y-4 max-w-md mx-auto">
     <div>
       <Label for="routeName">Monument Name (Route Name)</Label>
@@ -167,6 +167,12 @@
       <input id="answer{i}" type="text" on:input={(e) => addChoice(i, e)} value={answer} class="w-full p-2 border border-gray-300 rounded-lg" placeholder="Enter choice" />
     </div>
   {/each}
+
+  <!-- Correct Answer Input -->
+  <div>
+    <Label for="correctAnswer">Correct Answer</Label>
+    <input id="correctAnswer" type="text" bind:value={correctAnswer} placeholder="Enter the correct answer" class="w-full p-2 border border-gray-300 rounded-lg" required />
+  </div>
 
   <Button type="button" class="w-full bg-green-500 text-white px-4 py-2 rounded-lg" on:click={submitQuiz}>Submit Quiz</Button>
 </div>
