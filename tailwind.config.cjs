@@ -10,6 +10,6 @@ module.exports = {
     extend: {},
   },
   plugins: [
-    require('flowbite/plugin'), // Include Flowbite as a Tailwind plugin
+    require('daisyui'), // Include Flowbite as a Tailwind plugin
   ],
 };

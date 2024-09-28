@@ -121,11 +121,11 @@
       <input id="lng" type="number" step="any" bind:value={lng} placeholder="Enter Longitude" required class="w-full p-2 border border-gray-300 rounded-lg" />
     </div>
   
-    <!-- New file input for photo -->
+    <!-- Updated file input with capture attribute for opening the camera -->
     <div>
       <Label for="photo">Upload or Take Photo</Label>
       <p>Make sure it's unique within the area</p>
-      <input id="photo" type="file" bind:files={files} accept="image/*" class="w-full p-2 border border-gray-300 rounded-lg" />
+      <input id="photo" type="file" bind:files={files} accept="image/*" capture="environment" class="w-full p-2 border border-gray-300 rounded-lg" />
     </div>
   
     <!-- Button to fill coordinates with current location -->
