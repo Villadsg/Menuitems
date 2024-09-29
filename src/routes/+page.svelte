@@ -42,7 +42,7 @@
   {#if user}
     <!-- Show MonumentFinder component when logged in -->
     <div class="pt-20">
-      <p>Here is some interesting info and news. How to connect with other legendary quiz-takers? </p>
+      <p>Here is some interesting info and news. How to connect with other language learners? </p>
     </div>
   {:else}
     <!-- Background image section using Tailwind CSS for not logged-in users -->
