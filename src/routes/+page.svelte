@@ -3,7 +3,6 @@
   import MonumentFinder from '$lib/MonumentFinder.svelte';
   import { onMount } from 'svelte';
   import { writable } from 'svelte/store';
-  import { Spinner } from 'flowbite-svelte';
   import { Footer, FooterCopyright, FooterLinkGroup, FooterLink } from 'flowbite-svelte';
 
   // Writable store to manage the user state
@@ -38,12 +37,12 @@
 
 <!-- Home page content -->
 {#await $userStatus}
-<Spinner />
+<span class="loading loading-spinner loading-md"></span>
 {:then user}
   {#if user}
     <!-- Show MonumentFinder component when logged in -->
     <div class="pt-20">
-      <MonumentFinder />
+      <p>Here is some interesting info and news. How to connect with other legendary quiz-takers? </p>
     </div>
   {:else}
     <!-- Background image section using Tailwind CSS for not logged-in users -->

@@ -56,8 +56,9 @@
         lng: parseFloat(lng),
         quiz_question_answer: [
                 question,
-                ...answers.filter(answer => answer.trim() !== ""), // Exclude empty answers
-                correctAnswer  // Include the correct answer
+                correctAnswer,  // Include the correct answer
+                ...answers.filter(answer => answer.trim() !== "") // Exclude empty answers
+                
             ],
         userId: userId,
         ...(fileId && { photoFileId: fileId }) // Add photoFileId only if fileId exists
@@ -125,7 +126,7 @@
     <div>
       <Label for="photo">Upload or Take Photo</Label>
       <p>Make sure it's unique within the area</p>
-      <input id="photo" type="file" bind:files={files} accept="image/*" capture="environment" class="w-full p-2 border border-gray-300 rounded-lg" />
+      <input id="photo" type="file" bind:files={files} accept="image/*" capture="environment" required class="w-full p-2 border border-gray-300 rounded-lg" />
     </div>
   
     <!-- Button to fill coordinates with current location -->
