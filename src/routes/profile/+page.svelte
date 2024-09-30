@@ -18,6 +18,23 @@
       lat: '',
       lng: ''
     };
+
+    import { goto } from '$app/navigation';
+  
+  function navigateToEditTours() {
+    goto('/edit-tours');
+  }
+
+    
   
   </script>
+  
+  
+  <div class="flex justify-center items-center min-h-screen">
+    <button 
+      class="btn btn-primary" 
+      on:click={navigateToEditTours}>
+      List of own created tours
+    </button>
+  </div>
   
