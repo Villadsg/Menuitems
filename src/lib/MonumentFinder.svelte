@@ -11,6 +11,7 @@
 
   let monuments = [];
   let sortedMonuments = [];
+  let loading = true;  // Add loading state to track the loading process
 
   const loadMonuments = async () => {
     try {
@@ -33,6 +34,8 @@
       }));
     } catch (error) {
       console.error("Error loading monuments:", error);
+    } finally {
+      loading = false; // Set loading to false once monuments are loaded
     }
   };
 
@@ -93,6 +96,13 @@
     findLocation();
   });
 </script>
+
+{#if loading}
+    <div class="flex items-center justify-center h-screen">
+      <span class="loading loading-spinner loading-lg"></span>
+    </div>
+  
+  {/if}
 
 <!-- Results Page -->
 {#if page === 'results'}

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { fly } from 'svelte/transition';  // Import the fly transition
   import { databases, storage } from '$lib/appwrite'; // Import Appwrite services
   import { page } from '$app/stores'; // To access the query parameters
   import { onMount } from 'svelte';
@@ -9,7 +10,10 @@
   let quizAnswers = [];   // Array to store the quiz answers
   let selectedAnswer = "";  // Variable to store the user's selected answer
   let hasSubmitted = false;  // Variable to track if the user has submitted the quiz
-  let isCorrect = false;  // Variable to track if the user's answer is correct
+  let isCorrect = false;
+  let quizRoute = [];
+  let quizDescription = "";
+  let currentPage = 0;  // Variable to track the current page for the fly transition
 
   onMount(async () => {
     const params = new URLSearchParams($page.url.search);
@@ -38,6 +42,9 @@
         };
 
         // Extract the quiz question and answers from the document
+        quizDescription = doc.Description;
+        quizRoute = doc.steps_in_route;
+
         quizQuestion = doc.quiz_question_answer[0];  // Assuming the first element is the question
         quizAnswers = doc.quiz_question_answer.slice(2);  // The rest are the answers
         quizCorrectAnswer = doc.quiz_question_answer[1];
@@ -49,6 +56,17 @@
       monument = null;
     }
   });
+
+  // Function to go to the next page with a fly transition
+  function nextPage() {
+    currentPage = (currentPage + 1) % 3;  // Move to the next page
+  }
+    // Function to go back to the previous page with a fly transition
+    function prevPage() {
+    if (currentPage > 0) {
+      currentPage = (currentPage - 1);  // Move to the previous page
+    }
+  }
 
   // Function to handle answer selection
   function selectAnswer(answer: string) {
@@ -64,65 +82,94 @@
   }
 </script>
 
-<div class ="pt-20">
-{#if monument}
-<div class="max-w-4xl mx-auto p-6 bg-white rounded-lg shadow-md mt-8">
-  <!-- Directly Display Monument Details -->
-  <h1 class="text-3xl font-bold">{monument.name}</h1>
-  
-  {#if monument.photoUrl}
-    <img src={monument.photoUrl} alt={monument.name} class="my-4 w-full max-w-lg mx-auto rounded shadow" />
-  {/if}
+<!-- HTML Layout for Fly Transition Pages -->
+<div class="pt-20">
+  {#if monument}
+    <div class="max-w-4xl mx-auto p-6 bg-white rounded-lg shadow-md mt-8">
 
+      {#if currentPage !== 0}
+      <button class="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400 mb-4" on:click={prevPage}>
+        Back
+      </button>
+      {/if}
 
-  <!-- Display Quiz Section -->
-  <h2 class="mt-6 text-xl font-bold">Quiz</h2>
-  {#if quizQuestion}
-    <p class="mt-4 text-lg">{quizQuestion}</p>
+      {#key currentPage}
+        {#if currentPage === 0}
+          <div in:fly={{ y: 100, duration: 500 }} out:fly={{ y: -100, duration: 500 }}>
+            <!-- First Page: Photo, Route Name, and Description -->
+            <h1 class="text-3xl font-bold">{monument.name}</h1>
+            <p class="mt-4">{quizDescription}</p>
+            {#if monument.photoUrl}
+              <img src={monument.photoUrl} alt={monument.name} class="my-4 w-full max-w-lg mx-auto rounded shadow" />
+            {/if}
+           
+          </div>
+        {/if}
 
-    <ul class="mt-4 space-y-2">
-      {#each quizAnswers as answer}
-      <button 
-      class="w-full text-left bg-gray-200 p-2 rounded {selectedAnswer === answer ? 'bg-blue-200' : ''}"
-      on:click={() => selectAnswer(answer)}
-      type="button"
-    >
-      {answer}
-    </button>
-      {/each}
-    </ul>
+        {#if currentPage === 1}
+          <div in:fly={{ y: 100, duration: 500 }} out:fly={{ y: -100, duration: 500 }}>
+            <!-- Second Page: Quiz Route -->
+            <h2 class="text-xl font-bold">Route To Find the photo</h2>
+            <ul class="mt-4 space-y-2">
+              {#each quizRoute as step}
+                <li>{step}</li>
+              {/each}
+            </ul>
+          </div>
+        {/if}
 
-    <!-- Display submit button only if an answer is selected and quiz has not been submitted -->
-    {#if !hasSubmitted}
-      {#if selectedAnswer}
-        <button
-          class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 mt-4"
-          on:click={submitQuiz}
-        >
-          Submit
+        {#if currentPage === 2}
+          <div in:fly={{ y: 100, duration: 500 }} out:fly={{ y: -100, duration: 500 }}>
+            <!-- Third Page: Quiz Section -->
+            <h2 class="mt-6 text-xl font-bold">Quiz</h2>
+            {#if quizQuestion}
+              <p class="mt-4 text-lg">{quizQuestion}</p>
+
+              <ul class="mt-4 space-y-2">
+                {#each quizAnswers as answer}
+                  <button 
+                    class="w-full text-left bg-gray-200 p-2 rounded {selectedAnswer === answer ? 'bg-blue-200' : ''}"
+                    on:click={() => selectAnswer(answer)}
+                    type="button"
+                  >
+                    {answer}
+                  </button>
+                {/each}
+              </ul>
+
+              <!-- Display submit button only if an answer is selected and quiz has not been submitted -->
+              {#if !hasSubmitted}
+                {#if selectedAnswer}
+                  <button
+                    class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 mt-4"
+                    on:click={submitQuiz}
+                  >
+                    Submit
+                  </button>
+                {/if}
+              {/if}
+
+              <!-- Display result after submission -->
+              {#if hasSubmitted}
+                <p class="mt-4 text-lg font-bold">
+                  {isCorrect ? 'Correct answer!' : 'Wrong answer. Try again!'}
+                </p>
+              {/if}
+            {:else}
+              <p>No quiz available for this monument.</p>
+            {/if}
+          </div>
+        {/if}
+      {/key}
+
+      <!-- Button to navigate between pages -->
+      {#if currentPage < 2}
+        <button class="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400 mt-4" on:click={nextPage}>
+          Next
         </button>
       {/if}
-    {/if}
-
-    <!-- Display result after submission -->
-    {#if hasSubmitted}
-      <p class="mt-4 text-lg font-bold">
-        {isCorrect ? 'Correct answer!' : 'Wrong answer. Try again!'}
-      </p>
-    {/if}
-
+    </div>
   {:else}
-    <p>No quiz available for this monument.</p>
+    <p class="text-center text-red-500 mt-8">Monument not found.</p>
   {/if}
-
-  <button
-    class="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400 mt-4"
-    on:click={() => history.back()}
-  >
-    Back
-  </button>
-</div>
-{:else}
-<p class="text-center text-red-500 mt-8">Monument not found.</p>
-{/if}
 </div>

@@ -1,9 +1,7 @@
 <script lang="ts">
   import { account } from '$lib/appwrite';
-  import MonumentFinder from '$lib/MonumentFinder.svelte';
   import { onMount } from 'svelte';
   import { writable } from 'svelte/store';
-  import { Footer, FooterCopyright, FooterLinkGroup, FooterLink } from 'flowbite-svelte';
 
   // Writable store to manage the user state
   let userStatus = writable<Promise<null | object>>(null);
@@ -23,21 +21,13 @@
     userStatus.set(checkUser());
   });
 
-  const login = async () => {
-    try {
-      await account.createEmailPasswordSession(email, password);
-      userStatus.set(checkUser()); // Refresh user state by checking again
-    } catch (error) {
-      console.error('Login error:', error.message);
-      alert('Login failed: ' + error.message);
-    }
-  };
-
 </script>
 
 <!-- Home page content -->
 {#await $userStatus}
+<div class="flex items-center justify-center h-screen">
 <span class="loading loading-spinner loading-md"></span>
+</div>
 {:then user}
   {#if user}
     <!-- Show MonumentFinder component when logged in -->
@@ -61,20 +51,25 @@
       </div>
     </div>
 
-    <Footer class="bg-transparent">
-      <div class="sm:flex sm:items-center sm:justify-between">
-      <FooterCopyright href="/" by="Langtour™" year={2024} />
-      <FooterLinkGroup ulClass="flex flex-wrap items-center mt-3 text-sm text-gray-500 dark:text-gray-400 sm:mt-0">
-        <FooterLink href="/about">About</FooterLink>
-      </FooterLinkGroup>
+    <!-- DaisyUI Footer -->
+    <footer class="footer p-10 bg-neutral text-neutral-content">
+      <div>
+        <p class="font-bold">Langtour™</p>
+        <p>© 2024 - All rights reserved</p>
+      </div> 
+      <div>
+        <span class="footer-title">Services</span> 
+        <a href="/about" class="link link-hover">About</a>
+        <a href="/selectlanguage" class="link link-hover">Try a route</a>
+      </div> 
+      <div>
+        <span class="footer-title">Company</span> 
+        <a href="/about" class="link link-hover">About</a>
+        <a href="/contact" class="link link-hover">Contact</a>
       </div>
-    </Footer>
-
+    </footer>
   {/if}
-
-
 
 {:catch error}
   <div>Error loading user status: {error.message}</div>
 {/await}
-
