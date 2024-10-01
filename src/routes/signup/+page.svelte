@@ -3,6 +3,7 @@
   import { goto } from '$app/navigation';
   import { ID } from 'appwrite';
 
+  let username = '';
   let email = '';
   let password = '';
   let confirmPassword = ''; // New variable for confirm password
@@ -14,8 +15,8 @@
     }
 
     try {
-      await account.create(ID.unique(), email, password);
-      alert('Signup successful! Please check your email to verify your account.');
+      await account.create(ID.unique(), email, password, username);
+      alert('Signup successful! Now you can login)');
       goto('/');
     } catch (error) {
       console.error('Signup error:', error.message);
@@ -37,7 +38,18 @@
       class="input input-bordered w-full" 
     />
   </div>
-  
+  <div class="form-control">
+    <label for="userame" class="label">
+      <span class="label-text">Username</span>
+    </label>
+    <input 
+      id="username" 
+      type="username" 
+      bind:value={username} 
+      required 
+      class="input input-bordered w-full" 
+    />
+  </div>
   <div class="form-control">
     <label for="password" class="label">
       <span class="label-text">Password</span>
