@@ -14,15 +14,17 @@
   let quizRoute = [];
   let quizDescription = "";
   let currentPage = 0;  // Variable to track the current page for the fly transition
+  let userNameChangable = ""; // Variable to store the fetched userNameChangable attribute
 
   onMount(async () => {
     const params = new URLSearchParams($page.url.search);
     const id = params.get('id');  // Get monument ID from query params
 
     if (id) {
-      const databaseId = '6609473fbde756e5dc45';  // Your actual database ID
-      const collectionId = '66eefaaf001c2777deb9';  // Your actual collection ID
+      const databaseId = '6609473fbde756e5dc45';  // Your actual database ID for monuments
+      const collectionId = '66eefaaf001c2777deb9';  // Your actual collection ID for monuments
       const bucketId = '66efdb420000df196b64';  // Your actual storage bucket ID
+      const userCollectionId = '66fbb317002371bfdffc'; // Collection ID for users
 
       try {
         // Fetch the monument document by ID
@@ -39,7 +41,12 @@
           id: doc.$id,
           name: doc.Route_name,
           photoUrl,
+          userId: doc.userId // Assuming userID is part of the monument data
         };
+
+        // Fetch the user's document by their userID to get userNameChangable
+        const userDoc = await databases.getDocument(databaseId, userCollectionId, monument.userId);
+        userNameChangable = userDoc.userNameChangable;
 
         // Extract the quiz question and answers from the document
         quizDescription = doc.Description;
@@ -49,7 +56,7 @@
         quizAnswers = doc.quiz_question_answer.slice(2);  // The rest are the answers
         quizCorrectAnswer = doc.quiz_question_answer[1];
       } catch (error) {
-        console.error('Error loading monument:', error);
+        console.error('Error loading monument or user data:', error);
         monument = null;
       }
     } else {
@@ -98,11 +105,12 @@
           <div in:fly={{ y: 100, duration: 500 }} out:fly={{ y: -100, duration: 500 }}>
             <!-- First Page: Photo, Route Name, and Description -->
             <h1 class="text-3xl font-bold">{monument.name}</h1>
+            <p class="mt-2 text-gray-700">Created by: {userNameChangable}</p> <!-- Display the fetched userNameChangable -->
             <p class="mt-4">{quizDescription}</p>
             {#if monument.photoUrl}
               <img src={monument.photoUrl} alt={monument.name} class="my-4 w-full max-w-lg mx-auto rounded shadow" />
             {/if}
-           
+            
           </div>
         {/if}
 

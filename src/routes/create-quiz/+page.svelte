@@ -21,11 +21,11 @@
   };
 
   let currentPage = 'beginSection'; // Possible values: 'beginSection', 'routeSection', 'questionSection'
-
+ // Make userId reactive
+ $: userId = $user?.$id;
 
   const submitQuiz = async () => {
     try {
-      const userId = get(user)?.$id;
       
       let fileId = null;
 
@@ -118,7 +118,7 @@
           </div>
           <div>
             <Label for="Description">Description</Label>
-            <input id="Description" type="text" bind:value={routeName} placeholder="Enter Description" required class="w-full p-2 border border-gray-300 rounded-lg" />
+            <input id="Description" type="text" bind:value={Description} placeholder="Enter Description" required class="w-full p-2 border border-gray-300 rounded-lg" />
           </div>
           <div>
             <Label for="lat">Latitude</Label>

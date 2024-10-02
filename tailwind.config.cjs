@@ -10,6 +10,24 @@ module.exports = {
     extend: {},
   },
   plugins: [
-    require('daisyui'), // Include Flowbite as a Tailwind plugin
-  ],
+    require('daisyui')],
+  daisyui: {
+    themes: [
+      {
+        mytheme: {
+          'primary': '#4CAF50',
+          'secondary': '#FF5722',
+          'accent': '#3b82f6',
+          'neutral': '#3d4451',
+          'base-100': '#ffffff',
+          'info': '#2094f3',
+          'success': '#009485',
+          'warning': '#ff9900',
+          'error': '#ff5724',
+        },
+      },
+      'light', // Optional: you can also extend or use daisyUI built-in themes
+      'dark',
+    ],
+  },
 };
