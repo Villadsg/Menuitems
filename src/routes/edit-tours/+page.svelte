@@ -196,7 +196,7 @@ const modifyAnswers = (action, index) => {
   
             {#each editMonumentData.steps_in_route as step, index}
               <div class="flex items-center space-x-2">
-                <input type="text" bind:value={editMonumentData.steps_in_route[index]} class="input input-bordered" placeholder="Enter step" />
+                <input type="text" bind:value={editMonumentData.steps_in_route[index]} class="input input-bordered w-full" placeholder="Enter step" />
                 <button type="button" class="btn btn-outline btn-error" on:click={() => modifySteps('remove', index)}>Remove</button>
               </div>
             {/each}
@@ -209,7 +209,7 @@ const modifyAnswers = (action, index) => {
        
             {#each editMonumentData.quiz_question_answer as answer, index}
               <div class="flex items-center space-x-2">
-                <input type="text" bind:value={editMonumentData.quiz_question_answer[index]} class="input input-bordered" placeholder="Enter answer" />
+                <input type="text" bind:value={editMonumentData.quiz_question_answer[index]} class="input input-bordered w-full" placeholder="Enter answer" />
                 <button type="button" class="btn btn-outline btn-error" on:click={() => modifyAnswers('remove', index)}>Remove</button>
               </div>
             {/each}
