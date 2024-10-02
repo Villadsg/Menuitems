@@ -27,7 +27,7 @@ module.exports = {
         },
       },
       'light', // Optional: you can also extend or use daisyUI built-in themes
-      'dark',
+      'light',
     ],
   },
 };
