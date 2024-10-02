@@ -52,7 +52,7 @@
     </div>
 
     <!-- DaisyUI Footer -->
-    <footer class="footer p-10 bg-neutral text-neutral-content">
+    <footer class="footer p-5 bg-neutral text-neutral-content">
       <div>
         <p class="font-bold">Langtour™</p>
         <p>© 2024 - All rights reserved</p>
