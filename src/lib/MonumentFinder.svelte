@@ -92,6 +92,12 @@
     await loadMonuments();
     findLocation();
   });
+
+
+  function navigateTohome() {
+      goto('/');
+  }
+
 </script>
 
 {#if page !== 'results'}
@@ -126,7 +132,7 @@
     {/if}
     <button
       class="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400 mt-4"
-      on:click={() => (page = 'home')}
+      on:click={navigateTohome}
     >
       Back to Home
     </button>
