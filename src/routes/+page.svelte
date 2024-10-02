@@ -44,7 +44,7 @@
           <p class="mt-4">Create routes and become a tour designer</p>
           <a href="/selectlanguage">
             <button class="mt-8 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
-              Try a route
+              Try a Route
             </button>
           </a>
         </div>
@@ -59,8 +59,7 @@
       </div> 
       <div>
         <span class="footer-title">Services</span> 
-        <a href="/about" class="link link-hover">About</a>
-        <a href="/selectlanguage" class="link link-hover">Try a route</a>
+        <a href="/selectlanguage" class="link link-hover">Find the closest route</a>
       </div> 
       <div>
         <span class="footer-title">Company</span> 
