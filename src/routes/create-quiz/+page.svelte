@@ -15,6 +15,8 @@
   let answers = ["", "", "", ""]; // array to store up to 4 choices
   let correctAnswer = ""; // Field to store the correct answer
   let message = '';
+  const currentDate = new Date().toISOString();
+
 
   const addChoice = (index, event) => {
     answers[index] = event.target.value;
@@ -47,8 +49,10 @@
         fileId = response.$id;
       }
 
+
       // Store the quiz question, answers, and correct answer in quiz_question_answer attribute
       const documentData = {
+        dateModified: currentDate,
         Route_name: routeName,
         Description: Description,
         lat: parseFloat(lat),

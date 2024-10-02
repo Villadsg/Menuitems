@@ -6,7 +6,10 @@
   
   let monuments = [];
   let message = '';
-  
+  let monumentToDelete = null;
+let confirmationName = '';
+let errorMessage = '';
+
   const databaseId = '6609473fbde756e5dc45';
   const collectionId = '66eefaaf001c2777deb9';
   $: userId = $user?.$id;
@@ -37,14 +40,28 @@
     }
   };
 
-  const deleteMonument = async (id) => {
+
+
+  const confirmDelete = async () => {
+  if (monumentToDelete && confirmationName === monumentToDelete.Route_name) {
     try {
-      await databases.deleteDocument(databaseId, collectionId, id);
-      await loadMonuments();
+      await databases.deleteDocument(databaseId, collectionId, monumentToDelete.$id);
+      monumentToDelete = null;  // Reset the confirmation state
+      confirmationName = '';    // Clear the input
+      await loadMonuments();    // Reload the monuments list
     } catch (error) {
       console.error('Error deleting monument:', error);
     }
-  };
+  } else {
+    errorMessage = "The name you entered doesn't match the monument.";
+  }
+};
+
+const initiateDelete = (monument) => {
+  monumentToDelete = monument;
+  confirmationName = '';
+  errorMessage = '';
+};
 
   const editMonument = (monument) => {
     isEditing = true;
@@ -102,6 +119,31 @@
   onMount(async () => {
     await loadMonuments();
   });
+
+
+  const modifySteps = (action, index) => {
+  if (action === 'add') {
+    // Add a new step
+    editMonumentData.steps_in_route = [...editMonumentData.steps_in_route, ''];
+  } else if (action === 'remove' && index !== null) {
+    // Remove the step at the given index
+    editMonumentData.steps_in_route = editMonumentData.steps_in_route.filter((_, i) => i !== index);
+  }
+};
+
+
+const modifyAnswers = (action, index) => {
+  if (action === 'add') {
+    // Add a new answer
+    editMonumentData.quiz_question_answer = [...editMonumentData.quiz_question_answer, ''];
+  } else if (action === 'remove' && index !== null) {
+    // Remove the answer at the given index
+    editMonumentData.quiz_question_answer = editMonumentData.quiz_question_answer.filter((_, i) => i !== index);
+  }
+};
+
+
+
 </script>
 
 <div class="pt-20 max-w-lg mx-auto">
@@ -155,10 +197,10 @@
             {#each editMonumentData.steps_in_route as step, index}
               <div class="flex items-center space-x-2">
                 <input type="text" bind:value={editMonumentData.steps_in_route[index]} class="input input-bordered" placeholder="Enter step" />
-                <button type="button" class="btn btn-outline btn-error" on:click={() => editMonumentData.steps_in_route.splice(index, 1)}>Remove</button>
+                <button type="button" class="btn btn-outline btn-error" on:click={() => modifySteps('remove', index)}>Remove</button>
               </div>
             {/each}
-            <button type="button" class="btn btn-outline mt-2" on:click={() => editMonumentData.steps_in_route.push('')}>Add Step</button>
+            <button type="button" class="btn btn-outline mt-2" on:click={() => modifySteps('add')}>Add Step</button>
           </div>
 
           <div class="form-control">
@@ -168,10 +210,10 @@
             {#each editMonumentData.quiz_question_answer as answer, index}
               <div class="flex items-center space-x-2">
                 <input type="text" bind:value={editMonumentData.quiz_question_answer[index]} class="input input-bordered" placeholder="Enter answer" />
-                <button type="button" class="btn btn-outline btn-error" on:click={() => editMonumentData.quiz_question_answer.splice(index, 1)}>Remove</button>
+                <button type="button" class="btn btn-outline btn-error" on:click={() => modifyAnswers('remove', index)}>Remove</button>
               </div>
             {/each}
-            <button type="button" class="btn btn-outline mt-2" on:click={() => editMonumentData.quiz_question_answer.push('')}>Add Answer</button>
+            <button type="button" class="btn btn-outline mt-2" on:click={() => modifyAnswers('add')}>Add Answer</button>
           </div>
 
           <div class="card-actions justify-end mt-4">
@@ -184,6 +226,28 @@
   {/if}
 
   {#if !isEditing}
+
+  {#if monumentToDelete}
+  <div class="card bg-base-100 shadow-lg">
+    <div class="card-body">
+      <h3 class="card-title">Confirm Delete</h3>
+      <p>Are you sure you want to delete the monument "<strong>{monumentToDelete.Route_name}</strong>"?</p>
+      <p>Type the monument name below to confirm:</p>
+      <input type="text" bind:value={confirmationName} class="input input-bordered" placeholder="Monument name" />
+      
+      {#if errorMessage}
+        <div class="alert alert-error mt-2">{errorMessage}</div>
+      {/if}
+      
+      <div class="card-actions justify-end mt-4">
+        <button class="btn btn-outline" on:click={() => { monumentToDelete = null }}>Cancel</button>
+        <button class="btn btn-error" on:click={confirmDelete}>Confirm Delete</button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+
   <ul class="mt-6 space-y-4">
     {#each monuments as monument (monument.$id)}
       <li class="card bg-base-100 shadow-lg">
@@ -192,7 +256,7 @@
           <p><strong>Description:</strong> {monument.Description}</p>
           <p>Date Modified: {monument.dateModified}</p>
           <div class="card-actions justify-end">
-            <button class="btn btn-outline btn-error" on:click={() => deleteMonument(monument.$id)}>Delete</button>
+            <button class="btn btn-outline btn-error" on:click={() => initiateDelete(monument)}>Delete</button>
             <button class="btn btn-outline btn-primary ml-2" on:click={() => editMonument(monument)}>Edit</button>
           </div>
         </div>
