@@ -103,12 +103,12 @@
         <h1 class="text-2xl font-bold mb-4">Create Tour Challenge</h1>
         <form on:submit|preventDefault={() => currentPage = 'routeSection'} class="space-y-4 max-w-md mx-auto">
           <div>
-            <label for="routeName" class="label">Monument Name (Route Name)</label>
+            <label for="routeName" class="label">Tour Name</label>
             <input id="routeName" type="text" bind:value={routeName} placeholder="Enter Monument Name" required class="input input-bordered w-full" />
           </div>
           <div>
             <label for="Description" class="label">Description</label>
-            <input id="Description" type="text" bind:value={Description} placeholder="Enter Description" required class="input input-bordered w-full" />
+            <textarea id="Description" bind:value={Description} placeholder="Enter Description" required class="textarea textarea-bordered w-full h-24"></textarea>
           </div>
           <div>
             <label for="lat" class="label">Latitude</label>
