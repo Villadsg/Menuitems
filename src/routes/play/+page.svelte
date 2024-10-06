@@ -20,16 +20,22 @@
   onMount(async () => {
     const params = new URLSearchParams($page.url.search);
     const id = params.get('id');  // Get monument ID from query params
+    const lang = params.get('lang')
 
     if (id) {
       const databaseId = '6609473fbde756e5dc45';  // Your actual database ID for monuments
       const collectionId = '66eefaaf001c2777deb9';  // Your actual collection ID for monuments
       const bucketId = '66efdb420000df196b64';  // Your actual storage bucket ID
       const userCollectionId = '66fbb317002371bfdffc'; // Collection ID for users
+      const translatedCollectionId = "66fe6ac90010d9e9602f";
 
       try {
+
+        const currentCollectionId = lang === 'english' ? collectionId : translatedCollectionId;
         // Fetch the monument document by ID
-        const doc = await databases.getDocument(databaseId, collectionId, id);
+        const doc = await databases.getDocument(databaseId, currentCollectionId, id);
+
+        
 
         let photoUrl = null;
 

@@ -68,7 +68,8 @@
     const currentCollectionId = language === 'english' ? collectionIdEnglish : translatedCollectionId;
     
     // Load documents from the selected collection
-    const response = await databases.listDocuments(databaseId, currentCollectionId
+    const response = await databases.listDocuments(databaseId, currentCollectionId,
+     language === 'english' ? [] : [Query.equal("language", [language])]
     );
 
 
