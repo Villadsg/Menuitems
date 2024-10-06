@@ -8,13 +8,15 @@
   let Description = '';
   let lat = '';
   let lng = '';
-  let route_description = ["", "", "", ""];
+  let route_description = [];
   let question = "";
-  let answers = ["", "", "", ""];
+  let answers = [];
   let correctAnswer = "";
   let message = '';
-  const currentDate = new Date().toISOString();
+  let languages = ['ES','IT','DA','JA']; // Array to hold selected languages
+  const currentDate = new Date().toISOString().slice(0, 16).replace('T', ' ');
 
+   
   const addChoice = (index, event) => {
     answers[index] = event.target.value;
   };
@@ -22,24 +24,48 @@
   let currentPage = 'beginSection';
   $: userId = $user?.$id;
 
+  /** Function to translate text */
+  async function translateText(text: string, targetLang: string) {
+    try {
+      const response = await fetch('/api/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, targetLang })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Translation failed');
+      }
+
+      const data = await response.json();
+      return data.translation;
+    } catch (error) {
+      console.error('Translation error:', error);
+      return text; // Fallback to original text if translation fails
+    }
+  }
+
   const submitQuiz = async () => {
     try {
       let fileId = null;
 
-      if (files && files.length > 0) {
-        const file = files[0];
-        const response = await storage.createFile(
-          bucketId,
-          ID.unique(),
-          file,
-          [
-            Permission.read(Role.any()),
-            Permission.update(Role.user(userId)),
-            Permission.delete(Role.user(userId))
-          ]
-        );
-        fileId = response.$id;
-      }
+// Check if a photo is provided and store it in Appwrite after everything else is prepared
+if (files && files.length > 0) {
+  const file = files[0];
+  // Upload the file to Appwrite storage
+  const response = await storage.createFile(
+    bucketId,
+    ID.unique(),
+    file,
+    [
+      Permission.read(Role.any()),
+      Permission.update(Role.user(userId)),
+      Permission.delete(Role.user(userId))
+    ]
+  );
+  fileId = response.$id;
+}
 
       const documentData = {
         dateModified: currentDate,
@@ -57,7 +83,50 @@
         ...(fileId && { photoFileId: fileId })
       };
 
+      // Create the original document in Appwrite
       await databases.createDocument(databaseId, collectionId, ID.unique(), documentData);
+
+      // Check if any languages were selected
+      if (languages.length > 0) {
+        const translatedCollectionId = '66fe6ac90010d9e9602f'; // Adjust if necessary
+
+        // Loop through selected languages
+        for (const languageCode of languages) {
+          // Translate the inputs into the current language
+          const translatedRouteName = await translateText(routeName, languageCode);
+          const translatedDescription = await translateText(Description, languageCode);
+          const translatedRouteDescriptions = await Promise.all(
+            route_description.map(desc => translateText(desc, languageCode))
+          );
+          const translatedQuestion = await translateText(question, languageCode);
+          const translatedAnswers = await Promise.all(
+            answers.map(ans => translateText(ans, languageCode))
+          );
+          const translatedCorrectAnswer = await translateText(correctAnswer, languageCode);
+
+          // Create the translated document data
+          const translatedDocumentData = {
+            ...documentData,
+            Route_name: translatedRouteName,
+            Description: translatedDescription,
+            steps_in_route: translatedRouteDescriptions,
+            quiz_question_answer: [
+              translatedQuestion,
+              translatedCorrectAnswer,
+              ...translatedAnswers.filter(answer => answer.trim() !== "")
+            ],
+            language: languageCode,
+            lat: parseFloat(lat),
+            lng: parseFloat(lng), 
+            userId: userId,
+            ...(fileId && { photoFileId: fileId })
+          };
+
+          // Save the translated document
+          await databases.createDocument(databaseId, translatedCollectionId, ID.unique(), translatedDocumentData);
+        }
+      }
+
       currentPage = 'confirmationPage';
       setTimeout(() => {
         goto('/');
@@ -101,7 +170,7 @@
       {#if currentPage === 'beginSection'}
         <!-- First Section (Monument Form) -->
         <h1 class="text-2xl font-bold mb-4">Create Tour Challenge</h1>
-        <form on:submit|preventDefault={() => currentPage = 'routeSection'} class="space-y-4 max-w-md mx-auto">
+        <form on:submit|preventDefault={() => currentPage = 'photoSection'} class="space-y-4 max-w-md mx-auto">
           <div>
             <label for="routeName" class="label">Tour Name</label>
             <input id="routeName" type="text" bind:value={routeName} placeholder="Enter Monument Name" required class="input input-bordered w-full" />
@@ -118,11 +187,7 @@
             <label for="lng" class="label">Longitude</label>
             <input id="lng" type="number" step="any" bind:value={lng} placeholder="Enter Longitude" required class="input input-bordered w-full" />
           </div>
-          <div>
-            <label for="photo" class="label">Upload or Take Photo</label>
-            <p>Make sure it's unique within the area</p>
-            <input id="photo" type="file" bind:files={files} accept="image/*" capture="environment" required class="input input-bordered w-full" />
-          </div>
+          
           <button type="button" class="btn btn-outline w-full" on:click={getCurrentLocation} disabled={loading}>
             {#if loading}
               <span class="loading loading-spinner"></span> Loading...
@@ -130,19 +195,54 @@
               Use Current Location
             {/if}
           </button>
-          <button type="submit" class="btn btn-primary w-full">Next Page</button>
+
+          
+         
+          <button type="submit" class="btn btn-primary w-full">Next: add photo</button>
         </form>
+        {:else if currentPage === 'photoSection'}
+        <form on:submit|preventDefault={() => currentPage = 'routeSection'}  class="space-y-4 max-w-md mx-auto">
+          <div>
+            <label for="photo" class="label">Upload or Take the Photo a user should find</label>
+            <p>Make sure it's unique within the area</p>
+            <input id="photo" type="file" bind:files={files} accept="image/*" capture="environment" required class="input input-bordered w-full" />
+          </div>
+
+          <button type="submit" class="btn btn-primary w-full">Next: add route to photo</button>
+        </form>
+
       {:else if currentPage === 'routeSection'}
         <!-- Second Section (Route Descriptions) -->
         <form on:submit|preventDefault={() => currentPage = 'questionSection'}  class="space-y-4 max-w-md mx-auto">
           <h2 class="text-xl font-bold">Add Route Descriptions</h2>
-          <h3 class="text-lg">Describe up to 4 steps in your route:</h3>
-          {#each route_description as description, i (i)}
-            <div>
-              <label for="route{i}" class="label">Route Step {i + 1}</label>
-              <input id="route{i}" type="text" bind:value={route_description[i]} placeholder="Enter route description" class="input input-bordered w-full" />
-            </div>
-          {/each}
+          <h3 class="text-lg">Add steps in your route to the photo:</h3>
+          
+          {#each route_description as step, index}
+  <div class="flex items-center space-x-2">
+    <input 
+      type="text" 
+      bind:value={route_description[index]} 
+      class="input input-bordered w-full" 
+      placeholder="Enter step"
+    />
+    <button 
+      type="button" 
+      class="btn btn-outline btn-error" 
+      on:click={() => route_description = route_description.filter((_, i) => i !== index)}
+    >
+      Remove
+    </button>
+  </div>
+{/each}
+<button 
+  type="button" 
+  class="btn btn-outline mt-2" 
+  on:click={() => route_description = [...route_description, '']}
+>
+  Add Step
+</button>
+
+      
           <button type="submit" class="btn btn-primary w-full">Next: Add Quiz Question</button>
         </form>
       {:else if currentPage === 'questionSection'}
@@ -152,13 +252,32 @@
           <label for="question" class="label">Quiz Question</label>
           <input id="question" type="text" bind:value={question} placeholder="Enter quiz question" class="input input-bordered w-full" required />
         </div>
-        <h3 class="text-lg font-bold">Add up to 4 answer choices:</h3>
-        {#each answers as answer, i (i)}
-          <div>
-            <label for="answer{i}" class="label">Answer {i + 1}</label>
-            <input id="answer{i}" type="text" on:input={(e) => addChoice(i, e)} value={answer} class="input input-bordered w-full" placeholder="Enter choice" />
-          </div>
-        {/each}
+        <h3 class="text-lg font-bold">Add answer options in the multiple choice:</h3>
+        {#each answers as step, index}
+        <div class="flex items-center space-x-2">
+          <input 
+            type="text" 
+            bind:value={answers[index]} 
+            class="input input-bordered w-full" 
+            placeholder="Enter Potential Correct Answer"
+          />
+          <button 
+            type="button" 
+            class="btn btn-outline btn-error" 
+            on:click={() => answers = answers.filter((_, i) => i !== index)}
+          >
+            Remove
+          </button>
+        </div>
+      {/each}
+      <button 
+        type="button" 
+        class="btn btn-outline mt-2" 
+        on:click={() => answers = [...answers, '']}
+      >
+        Add Step
+      </button>
+      
         <div>
           <label for="correctAnswer" class="label">Correct Answer</label>
           <input id="correctAnswer" type="text" bind:value={correctAnswer} placeholder="Enter the correct answer" class="input input-bordered w-full" required />

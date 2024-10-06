@@ -8,6 +8,7 @@
   let quizQuestion = "";
   let quizCorrectAnswer = "";   // Store the correct quiz answer
   let quizAnswers = [];   // Array to store the quiz answers
+  let dateMod = Date();
   let selectedAnswer = "";  // Variable to store the user's selected answer
   let hasSubmitted = false;  // Variable to track if the user has submitted the quiz
   let isCorrect = false;
@@ -51,9 +52,9 @@
         // Extract the quiz question and answers from the document
         quizDescription = doc.Description;
         quizRoute = doc.steps_in_route;
-
-        quizQuestion = doc.quiz_question_answer[0];  // Assuming the first element is the question
-        quizAnswers = doc.quiz_question_answer.slice(2);  // The rest are the answers
+        dateMod = doc.dateModified.slice(0, 16).replace('T', ' ');;
+        quizQuestion = doc.quiz_question_answer[0]; 
+        quizAnswers = doc.quiz_question_answer.slice(2);  
         quizCorrectAnswer = doc.quiz_question_answer[1];
       } catch (error) {
         console.error('Error loading monument or user data:', error);
@@ -105,7 +106,8 @@
           <div in:fly={{ y: 100, duration: 500 }} out:fly={{ y: -100, duration: 500 }}>
             <!-- First Page: Photo, Route Name, and Description -->
             <h1 class="text-3xl font-bold">{monument.name}</h1>
-            <p class="mt-2 text-gray-700">Created by: {userNameChangable}</p> <!-- Display the fetched userNameChangable -->
+            <p class="mt-2 text-gray-700">Created by: {userNameChangable}</p> 
+            <p class="mt-2 text-gray-700">{dateMod}</p>
             <p class="mt-4">{quizDescription}</p>
             {#if monument.photoUrl}
               <img src={monument.photoUrl} alt={monument.name} class="my-4 w-full max-w-lg mx-auto rounded shadow" />

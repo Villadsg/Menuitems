@@ -36,8 +36,10 @@
 	"dependencies": {
 		"appwrite": "^15.0.0",
 		"daisyui": "^4.12.10",
+		"deepl-node": "^1.14.0",
 		"flowbite": "^2.5.1",
 		"flowbite-svelte": "^0.46.17",
-		"svelte-i18n": "^4.0.0"
+		"svelte-i18n": "^4.0.0",
+		"svelte-select": "^5.8.3"
 	}
 }

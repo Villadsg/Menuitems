@@ -2,6 +2,7 @@
   import { selectedLanguage } from '$lib/languageStore';
   import { goto } from '$app/navigation';
   import { databases, storage } from '$lib/appwrite'; // Import Appwrite services
+	import { Query } from 'appwrite';
 
   let language = 'english'; // Default language
   let latitude = null;
@@ -12,7 +13,8 @@
   let monuments = [];
 
   const databaseId = '6609473fbde756e5dc45';  // Your actual database ID
-  const collectionId = '66eefaaf001c2777deb9';  // Your actual collection ID
+  const collectionIdEnglish = '66eefaaf001c2777deb9';  // Your actual collection ID
+  const translatedCollectionId = '66fe6ac90010d9e9602f';  // Your translated collection ID
   const bucketId = '66efdb420000df196b64';  // Replace with your Appwrite collection ID
 
   const submitLanguage = () => {
@@ -61,7 +63,15 @@
 
   // Load monuments from the Appwrite database
   const loadMonuments = async () => {
-    const response = await databases.listDocuments(databaseId, collectionId);
+
+
+    const currentCollectionId = language === 'english' ? collectionIdEnglish : translatedCollectionId;
+    
+    // Load documents from the selected collection
+    const response = await databases.listDocuments(databaseId, currentCollectionId
+    );
+
+
     monuments = await Promise.all(response.documents.map(async (doc) => {
       let photoUrl = null;
 
@@ -116,10 +126,10 @@
       <label for="language" class="font-bold">Select Language:</label>
       <select id="language" bind:value={language} class="p-2 border rounded w-full">
         <option value="english">English</option>
-        <option value="spanish">Spanish</option>
-        <option value="italian">Italian</option>
-        <option value="japanese">Japanese</option>
-        <option value="danish">Danish</option>
+        <option value="ES">Spanish</option>
+        <option value="IT">Italian</option>
+        <option value="JA">Japanese</option>
+        <option value="DA">Danish</option>
       </select>
     </div>
 
