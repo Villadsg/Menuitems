@@ -159,7 +159,7 @@
         <div class="custom-spinner mr-2"></div>
         Loading...
       {:else}
-        Continue
+        Find the closest route
       {/if}
     </button>
   </div>

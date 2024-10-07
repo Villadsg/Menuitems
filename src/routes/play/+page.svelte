@@ -194,7 +194,7 @@ function selectAnswer(answer: string) {
         </button>
       {/if}
        <!-- Display submit button only if an answer is selected and quiz has not been submitted -->
-       {#if !hasSubmitted}
+       {#if !hasSubmitted && currentPage === 2}
        {#if selectedAnswer}
          <button class="btn btn-primary mt-4" on:click={submitQuiz}>
            Submit
