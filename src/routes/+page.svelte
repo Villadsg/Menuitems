@@ -3,9 +3,6 @@
   import { onMount } from 'svelte';
   import { writable } from 'svelte/store';
 
-  // Writable store to manage the user state
-  let userStatus = writable<Promise<null | object>>(null);
-
   // Function to check user login status
   const checkUser = async () => {
     try {
@@ -16,6 +13,9 @@
     }
   };
 
+  // Writable store to manage the user state
+  let userStatus = writable<Promise<null | object>>(null);
+
   // Run checkUser when the component is mounted and store the promise
   onMount(() => {
     userStatus.set(checkUser());
@@ -25,14 +25,14 @@
 
 <!-- Home page content -->
 {#await $userStatus}
-<div class="flex items-center justify-center h-screen">
-<span class="loading loading-spinner loading-md"></span>
-</div>
+  <div class="flex items-center justify-center h-screen">
+    <span class="loading loading-spinner loading-md"></span>
+  </div>
 {:then user}
   {#if user}
     <!-- Show MonumentFinder component when logged in -->
     <div class="pt-20">
-      <p>Here is some interesting info and news. How to connect with other language learners? </p>
+      <p>Here is some interesting info and news. How to connect with other language learners?</p>
     </div>
   {:else}
     <!-- Background image section using Tailwind CSS for not logged-in users -->
@@ -68,7 +68,7 @@
       </div>
     </footer>
   {/if}
-
 {:catch error}
+  <!-- No need to treat it as a critical error -->
   <div>Error loading user status: {error.message}</div>
 {/await}

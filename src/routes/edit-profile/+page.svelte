@@ -3,31 +3,36 @@
     import { onMount } from 'svelte';
     import { goto } from '$app/navigation';
     import { user } from '$lib/userStore';
-  
-     // Make userId reactive
-     $: userId = $user?.$id;
-  
+
+    // Make userId reactive
+    $: userId = $user?.$id;
+
     let username = '';
     let langLearning = ''; // To store selected language for learning
     let langSpeaking = ''; // To store selected language for speaking
     let usernamechange = ''; // This will now be changeable via the UI
-  
+
     // Profile info database collection
     const databaseId = '6609473fbde756e5dc45';
     const collectionId = '66fbb317002371bfdffc';
-  
-    // 5 most spoken languages
-    const mostSpokenLanguages = ['English', 'Italian', 'Spanish', 'Japanese', 'Danish'];
-  
+
+    // Mapping between language full names and abbreviations
+    const languageMap = {
+        'English': 'EN',
+        'Italian': 'IT',
+        'Spanish': 'ES',
+        'Japanese': 'JA',
+        'Danish': 'DA'
+    };
+
+    const mostSpokenLanguages = Object.keys(languageMap);
+    
     // Fetch user details from the Appwrite account
     onMount(async () => {
         try {
             const userInfo = await account.get();
             username = userInfo.name || 'Guest';
-  
-            // Set the default value for usernamechange to the fetched username
-            //usernamechange = username;
-  
+
             // Fetch existing user document, if it exists, and pre-fill the fields
             try {
                 const userDocument = await databases.getDocument(
@@ -37,8 +42,12 @@
                 );
                 if (userDocument) {
                     // If the document exists, pre-fill the form with existing data
-                    langLearning = userDocument.langLearn || '';
-                    langSpeaking = userDocument.langSpeak || '';
+                    langLearning = Object.keys(languageMap).find(
+                        key => languageMap[key] === userDocument.langLearn
+                    ) || '';
+                    langSpeaking = Object.keys(languageMap).find(
+                        key => languageMap[key] === userDocument.langSpeak
+                    ) || '';
                     usernamechange = userDocument.userNameChangable || username;
                 }
             } catch (error) {
@@ -48,14 +57,14 @@
             console.error('Failed to fetch user data:', error);
         }
     });
-  
+
     // Function to save selected languages to the user's profile
     async function saveUserInfo() {
         if (!userId) {
             console.error('User ID is not available');
             return;
         }
-  
+
         try {
             // Check if the user's document exists
             let userDocument;
@@ -69,7 +78,7 @@
                 // If the document doesn't exist, catch the error and proceed to create one
                 console.log('Document not found, creating a new one.');
             }
-  
+
             if (userDocument) {
                 // If document exists, update it
                 const response = await databases.updateDocument(
@@ -77,8 +86,8 @@
                     collectionId,
                     userId,  // Use the userId as the document ID
                     {
-                        langLearn: langLearning,
-                        langSpeak: langSpeaking,
+                        langLearn: languageMap[langLearning],  // Store abbreviation
+                        langSpeak: languageMap[langSpeaking],
                         userNameChangable: usernamechange
                     }
                 );
@@ -91,8 +100,8 @@
                     collectionId,
                     userId,  // Use the userId as the document ID
                     {
-                        langLearn: langLearning,
-                        langSpeak: langSpeaking,
+                        langLearn: languageMap[langLearning],
+                        langSpeak: languageMap[langSpeaking],
                         userNameChangable: usernamechange
                     }
                 );
@@ -103,14 +112,12 @@
             console.error('Failed to update or create document:', error);
         }
     }
-  
-  
-  </script>
-  
-  <!-- HTML Template -->
-  <div class="flex justify-center items-center min-h-screen">
+</script>
+
+<!-- HTML Template -->
+<div class="flex justify-center items-center min-h-screen">
     <div class="text-center">
-  
+
         <!-- Username Changeable Text Field -->
         <div class="mt-4">
             <label for="usernameChange" class="block">Change Your Username:</label>
@@ -121,36 +128,35 @@
                 class="mt-2 p-2 border rounded"
                 placeholder="Enter new username" />
         </div>
-  
+
         <!-- Language for Learning -->
         <div class="mt-4">
             <label for="langLearn" class="block">Select the language you are learning:</label>
             <select id="langLearn" bind:value={langLearning} class="mt-2">
-                <option value="" disabled selected>Select a language</option>
+                <option value="" disabled>Select a language</option>
                 {#each mostSpokenLanguages as language}
-                    <option value={language}>{language}</option>
+                    <option value={language} selected={langLearning === language}>{language}</option>
                 {/each}
             </select>
         </div>
-  
+
         <!-- Language for Speaking -->
         <div class="mt-4">
             <label for="langSpeak" class="block">Select the language you are speaking:</label>
             <select id="langSpeak" bind:value={langSpeaking} class="mt-2">
-                <option value="" disabled selected>Select a language</option>
+                <option value="" disabled>Select a language</option>
                 {#each mostSpokenLanguages as language}
-                    <option value={language}>{language}</option>
+                    <option value={language} selected={langSpeaking === language}>{language}</option>
                 {/each}
             </select>
         </div>
-  
+
         <!-- Save Button -->
         <button 
             class="btn btn-primary mt-4" 
             on:click={saveUserInfo}>
             Save Changes
         </button>
-  
+
     </div>
-  </div>
-  
+</div>

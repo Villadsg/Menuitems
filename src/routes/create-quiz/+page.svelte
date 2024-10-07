@@ -83,8 +83,8 @@ if (files && files.length > 0) {
         ...(fileId && { photoFileId: fileId })
       };
 
-      // Create the original document in Appwrite
-      await databases.createDocument(databaseId, collectionId, ID.unique(), documentData);
+      const originalDocument = await databases.createDocument(databaseId, collectionId, ID.unique(), documentData);
+      const originalDocumentId = originalDocument.$id;
 
       // Check if any languages were selected
       if (languages.length > 0) {
@@ -116,6 +116,7 @@ if (files && files.length > 0) {
               ...translatedAnswers.filter(answer => answer.trim() !== "")
             ],
             language: languageCode,
+            idOriginal: originalDocumentId,
             lat: parseFloat(lat),
             lng: parseFloat(lng), 
             userId: userId,
@@ -253,35 +254,42 @@ if (files && files.length > 0) {
           <input id="question" type="text" bind:value={question} placeholder="Enter quiz question" class="input input-bordered w-full" required />
         </div>
         <h3 class="text-lg font-bold">Add answer options in the multiple choice:</h3>
-        {#each answers as step, index}
-        <div class="flex items-center space-x-2">
-          <input 
-            type="text" 
-            bind:value={answers[index]} 
-            class="input input-bordered w-full" 
-            placeholder="Enter Potential Correct Answer"
-          />
-          <button 
-            type="button" 
-            class="btn btn-outline btn-error" 
-            on:click={() => answers = answers.filter((_, i) => i !== index)}
-          >
-            Remove
-          </button>
-        </div>
-      {/each}
+        {#each answers as answer, index}
+  <div class="flex items-center space-x-2">
+    <!-- Answer input -->
+    <input 
+      type="text" 
+      bind:value={answers[index]} 
+      class="input input-bordered w-full" 
+      placeholder="Enter answer option"
+    />
+    
+    <!-- Radio button for marking the correct answer -->
+    <input 
+      type="radio" 
+      name="correctAnswer" 
+      value={answers[index]} 
+      checked={correctAnswer === answers[index]} 
+      on:change={() => correctAnswer = answers[index]}
+    />
+    
+    <button 
+      type="button" 
+      class="btn btn-outline btn-error" 
+      on:click={() => answers = answers.filter((_, i) => i !== index)}
+    >
+      Remove
+    </button>
+  </div>
+{/each}
       <button 
         type="button" 
         class="btn btn-outline mt-2" 
         on:click={() => answers = [...answers, '']}
       >
-        Add Step
+        Add Option
       </button>
       
-        <div>
-          <label for="correctAnswer" class="label">Correct Answer</label>
-          <input id="correctAnswer" type="text" bind:value={correctAnswer} placeholder="Enter the correct answer" class="input input-bordered w-full" required />
-        </div>
         <button type="button" class="btn btn-success w-full" on:click={submitQuiz}>Submit Quiz</button>
       {:else if currentPage === 'confirmationPage'}
         <!-- Confirmation Page -->

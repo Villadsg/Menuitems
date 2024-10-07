@@ -8,7 +8,7 @@
   const databaseId = '6609473fbde756e5dc45';  // Use your actual database ID
   const collectionId = '66eefaaf001c2777deb9';  // Use your actual collection ID
   const bucketId = '66efdb420000df196b64'; 
-
+  let language = 'english';
   let monuments = [];
   let sortedMonuments = [];
 
@@ -84,7 +84,7 @@
   // Function to handle monument selection
   const selectMonument = (monument) => {
     // Navigate to the new page with the monument's ID
-    goto(`/play?id=${monument.id}`);
+    goto(`/play?id=${monument.id}&lang=${language}`);
   };
 
   // Automatically load monuments and find the user's location when the component is mounted

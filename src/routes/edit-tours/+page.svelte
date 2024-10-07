@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { databases } from '$lib/appwrite';
+  import { databases, storage } from '$lib/appwrite';
   import { user } from '$lib/userStore';
   import { onMount } from 'svelte';
   import { Query } from 'appwrite';
@@ -12,6 +12,7 @@ let errorMessage = '';
 
   const databaseId = '6609473fbde756e5dc45';
   const collectionId = '66eefaaf001c2777deb9';
+  const translatedCollectionId = '66fe6ac90010d9e9602f';
   $: userId = $user?.$id;
   
   let isEditing = false;
@@ -24,6 +25,32 @@ let errorMessage = '';
     steps_in_route: [''],
     quiz_question_answer: ['']
   };
+
+
+
+  
+  /** Function to translate text */
+  async function translateText(text: string, targetLang: string) {
+    try {
+      const response = await fetch('/api/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, targetLang })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Translation failed');
+      }
+
+      const data = await response.json();
+      return data.translation;
+    } catch (error) {
+      console.error('Translation error:', error);
+      return text; // Fallback to original text if translation fails
+    }
+  }
+
 
   const loadMonuments = async () => {
     try {
@@ -45,6 +72,25 @@ let errorMessage = '';
   const confirmDelete = async () => {
   if (monumentToDelete && confirmationName === monumentToDelete.Route_name) {
     try {
+
+       // First, delete the associated photo if it exists
+       if (monumentToDelete.photoFileId) {
+          await storage.deleteFile('66efdb420000df196b64', monumentToDelete.photoFileId); // Replace 'your-bucket-id' with your actual bucket ID
+        }
+      
+        // Delete all copies of the monument from the other collection
+        const copies = await databases.listDocuments(
+          databaseId,
+          translatedCollectionId,
+          [Query.equal('idOriginal', monumentToDelete.$id)]
+        );
+
+        // Iterate over each copy and delete it
+        for (const copy of copies.documents) {
+          await databases.deleteDocument(databaseId, translatedCollectionId, copy.$id);
+        }
+
+        // then do the big work
       await databases.deleteDocument(databaseId, collectionId, monumentToDelete.$id);
       monumentToDelete = null;  // Reset the confirmation state
       confirmationName = '';    // Clear the input
@@ -90,6 +136,42 @@ const initiateDelete = (monument) => {
 
     // Perform the update
     await databases.updateDocument(databaseId, collectionId, id, updatedData);
+
+
+    // Fetch all translated copies from the copies collection
+    const copies = await databases.listDocuments(
+        databaseId,
+        translatedCollectionId,
+        [Query.equal('idOriginal', id)]
+      );
+
+      // Iterate over each copy and update with translated text
+      for (const copy of copies.documents) {
+        const targetLang = copy.language; // Assuming each copy has a 'language' field
+        
+        // Translate relevant fields
+        const translatedRouteName = await translateText(updatedData.Route_name, targetLang);
+        const translatedDescription = await translateText(updatedData.Description, targetLang);
+
+        // Translate steps in route
+        const translatedSteps = await Promise.all(
+          updatedData.steps_in_route.map(step => translateText(step, targetLang))
+        );
+
+        // Translate quiz question answers
+        const translatedAnswers = await Promise.all(
+          updatedData.quiz_question_answer.map(answer => translateText(answer, targetLang))
+        );
+
+        // Update the translated copy with the new translated text
+        await databases.updateDocument(databaseId, translatedCollectionId, copy.$id, {
+          Route_name: translatedRouteName,
+          Description: translatedDescription,
+          steps_in_route: translatedSteps,
+          quiz_question_answer: translatedAnswers,
+          dateModified: currentDate
+        });
+      }
     
     // Reset the editing state
     isEditing = false;
