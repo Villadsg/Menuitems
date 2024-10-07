@@ -180,7 +180,7 @@ const initiateDelete = (monument) => {
       await databases.createDocument(databaseId, translatedCollectionId, ID.unique(), {
         idOriginal: id,
         language: code, // Store the language code
-        Route_name: translatedRouteName,
+        Route_name: editMonumentData.Route_name,
         lat: updatedData.lat,
         lng: updatedData.lng,
         userId,

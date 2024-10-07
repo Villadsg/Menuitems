@@ -16,7 +16,7 @@
   let quizDescription = "";
   let currentPage = 0;  // Variable to track the current page for the fly transition
   let userNameChangable = ""; // Variable to store the fetched userNameChangable attribute
-  
+  let stillLoading = true;
 
   onMount(async () => {
     const params = new URLSearchParams($page.url.search);
@@ -64,13 +64,18 @@
         quizQuestion = doc.quiz_question_answer[0]; 
         quizAnswers = doc.quiz_question_answer.slice(2);  
         quizCorrectAnswer = doc.quiz_question_answer[1];
+
+
       } catch (error) {
         console.error('Error loading monument or user data:', error);
         monument = null;
+        
       }
     } else {
       monument = null;
+     
     }
+    stillLoading = false;
   });
 
   // Function to go to the next page with a fly transition
@@ -100,9 +105,16 @@ function selectAnswer(answer: string) {
 </script>
 <!-- HTML Layout for Fly Transition Pages -->
 <div class="pt-20">
+
+  
+  {#if stillLoading}
+  <div class="flex items-center justify-center h-screen">
+    <span class="loading loading-spinner loading-lg"></span>
+  </div>
+ {/if}
+
   {#if monument}
     <div class="card max-w-4xl mx-auto p-6 bg-base-100 shadow-xl mt-8">
-      
 
       {#key currentPage}
         <!-- First Page: Photo, Route Name, and Description -->

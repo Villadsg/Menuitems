@@ -93,7 +93,6 @@ if (files && files.length > 0) {
         // Loop through selected languages
         for (const languageCode of languages) {
           // Translate the inputs into the current language
-          const translatedRouteName = await translateText(routeName, languageCode);
           const translatedDescription = await translateText(Description, languageCode);
           const translatedRouteDescriptions = await Promise.all(
             route_description.map(desc => translateText(desc, languageCode))
@@ -107,7 +106,7 @@ if (files && files.length > 0) {
           // Create the translated document data
           const translatedDocumentData = {
             ...documentData,
-            Route_name: translatedRouteName,
+            Route_name: routeName,
             Description: translatedDescription,
             steps_in_route: translatedRouteDescriptions,
             quiz_question_answer: [
