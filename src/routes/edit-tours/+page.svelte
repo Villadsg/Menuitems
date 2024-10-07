@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { databases, storage } from '$lib/appwrite';
+  import { databases, storage, ID } from '$lib/appwrite';
   import { user } from '$lib/userStore';
   import { onMount } from 'svelte';
   import { Query } from 'appwrite';
@@ -21,6 +21,7 @@ let errorMessage = '';
     Route_name: '',
     lat: '',
     lng: '',
+    photoFileId:'',
     Description: '',
     steps_in_route: [''],
     quiz_question_answer: ['']
@@ -116,6 +117,7 @@ const initiateDelete = (monument) => {
       Route_name: monument.Route_name,
       lat: monument.lat,
       lng: monument.lng,
+      photoFileId: monument.photoFileId,
       Description: monument.Description || '',
       steps_in_route: monument.steps_in_route || [],
       quiz_question_answer: monument.quiz_question_answer || []
@@ -134,45 +136,62 @@ const initiateDelete = (monument) => {
     updatedData.lat = parseFloat(editMonumentData.lat);
     updatedData.lng = parseFloat(editMonumentData.lng);
 
-    // Perform the update
+    // Perform the update for the original monument
     await databases.updateDocument(databaseId, collectionId, id, updatedData);
-
 
     // Fetch all translated copies from the copies collection
     const copies = await databases.listDocuments(
-        databaseId,
-        translatedCollectionId,
-        [Query.equal('idOriginal', id)]
+      databaseId,
+      translatedCollectionId,
+      [Query.equal('idOriginal', id)]
+    );
+
+    // Iterate over each copy and delete it
+    for (const copy of copies.documents) {
+      await databases.deleteDocument(databaseId, translatedCollectionId, copy.$id);
+    }
+
+    // Language codes for translations
+    const targetLangs = {
+      'Italian': 'IT',
+      'Spanish': 'ES',
+      'Japanese': 'JA',
+      'Danish': 'DA'
+    };
+
+    // Create a new translated document for each language
+    for (const [language, code] of Object.entries(targetLangs)) {
+      
+      // Translate relevant fields
+      const translatedRouteName = await translateText(updatedData.Route_name, code);
+      const translatedDescription = await translateText(updatedData.Description, code);
+
+      // Translate steps in route
+      const translatedSteps = await Promise.all(
+        updatedData.steps_in_route.map(step => translateText(step, code))
       );
 
-      // Iterate over each copy and update with translated text
-      for (const copy of copies.documents) {
-        const targetLang = copy.language; // Assuming each copy has a 'language' field
-        
-        // Translate relevant fields
-        const translatedRouteName = await translateText(updatedData.Route_name, targetLang);
-        const translatedDescription = await translateText(updatedData.Description, targetLang);
+      // Translate quiz question answers
+      const translatedAnswers = await Promise.all(
+        updatedData.quiz_question_answer.map(answer => translateText(answer, code))
+      );
 
-        // Translate steps in route
-        const translatedSteps = await Promise.all(
-          updatedData.steps_in_route.map(step => translateText(step, targetLang))
-        );
+      // Create a new translated document in the collection
+      await databases.createDocument(databaseId, translatedCollectionId, ID.unique(), {
+        idOriginal: id,
+        language: code, // Store the language code
+        Route_name: translatedRouteName,
+        lat: updatedData.lat,
+        lng: updatedData.lng,
+        userId,
+        photoFileId: editMonumentData.photoFileId,
+        Description: translatedDescription,
+        steps_in_route: translatedSteps,
+        quiz_question_answer: translatedAnswers,
+        dateModified: currentDate
+      });
+    }
 
-        // Translate quiz question answers
-        const translatedAnswers = await Promise.all(
-          updatedData.quiz_question_answer.map(answer => translateText(answer, targetLang))
-        );
-
-        // Update the translated copy with the new translated text
-        await databases.updateDocument(databaseId, translatedCollectionId, copy.$id, {
-          Route_name: translatedRouteName,
-          Description: translatedDescription,
-          steps_in_route: translatedSteps,
-          quiz_question_answer: translatedAnswers,
-          dateModified: currentDate
-        });
-      }
-    
     // Reset the editing state
     isEditing = false;
     editMonumentData = {
@@ -191,6 +210,7 @@ const initiateDelete = (monument) => {
     message = 'Failed to update monument.';
   }
 };
+
 
 
   const cancelEdit = () => {

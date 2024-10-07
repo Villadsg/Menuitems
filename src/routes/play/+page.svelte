@@ -103,12 +103,6 @@ function selectAnswer(answer: string) {
   {#if monument}
     <div class="card max-w-4xl mx-auto p-6 bg-base-100 shadow-xl mt-8">
       
-      <!-- Back Button -->
-      {#if currentPage !== 0}
-        <button class="btn btn-secondary mb-4" on:click={prevPage}>
-          Back
-        </button>
-      {/if}
 
       {#key currentPage}
         <!-- First Page: Photo, Route Name, and Description -->
@@ -159,14 +153,6 @@ function selectAnswer(answer: string) {
 
               
 
-              <!-- Display submit button only if an answer is selected and quiz has not been submitted -->
-              {#if !hasSubmitted}
-                {#if selectedAnswer}
-                  <button class="btn btn-primary w-full mt-4" on:click={submitQuiz}>
-                    Submit
-                  </button>
-                {/if}
-              {/if}
 
               <!-- Display result after submission -->
               {#if hasSubmitted}
@@ -181,12 +167,29 @@ function selectAnswer(answer: string) {
         {/if}
       {/key}
 
+    
+                  <div>
+        <!-- Back Button -->
+      {#if currentPage !== 0}
+        <button class="btn btn-secondary mb-4" on:click={prevPage}>
+          Back
+        </button>
+      {/if}
       <!-- Button to navigate between pages -->
       {#if currentPage < 2}
         <button class="btn btn-secondary mt-4" on:click={nextPage}>
           Next
         </button>
       {/if}
+       <!-- Display submit button only if an answer is selected and quiz has not been submitted -->
+       {#if !hasSubmitted}
+       {#if selectedAnswer}
+         <button class="btn btn-primary mt-4" on:click={submitQuiz}>
+           Submit
+         </button>
+       {/if}
+     {/if}
+                  </div>
     </div>
   {:else}
     <div class="alert alert-error mt-8 text-center">
