@@ -4,20 +4,20 @@
   import { page } from '$app/stores'; // To access the query parameters
   import { onMount } from 'svelte';
   
-  let monument = null;  // Object to store monument details
+  let monument: string;  // Object to store monument details
   let quizQuestion = "";
   let quizCorrectAnswer = "";   // Store the correct quiz answer
-  let quizAnswers = [];   // Array to store the quiz answers
+  let quizAnswers: string [] = [];   // Array to store the quiz answers
   let dateMod = Date();
   let selectedAnswer = "";  // Variable to store the user's selected answer
   let hasSubmitted = false;  // Variable to track if the user has submitted the quiz
   let isCorrect = false;
-  let quizRoute = [];
+  let quizRoute: string [] = [];
+  let startingDescription = "";
   let quizDescription = "";
   let currentPage = 0;  // Variable to track the current page for the fly transition
   let userNameChangable = ""; // Variable to store the fetched userNameChangable attribute
   let stillLoading = true;
-
   onMount(async () => {
     const params = new URLSearchParams($page.url.search);
     const id = params.get('id');  // Get monument ID from query params
@@ -40,16 +40,25 @@
         
 
         let photoUrl = null;
+        let photoStartingPointUrl = null;
 
         if (doc.photoFileId) {
           // Get the file preview URL from Appwrite storage
           photoUrl = storage.getFilePreview(bucketId, doc.photoFileId).href;
         }
 
+      
+        // Get the starting point photo URL using the first value in the quizStartingPoint array
+        if (doc.startingPoint[0]) {
+          photoStartingPointUrl = storage.getFilePreview(bucketId, doc.startingPoint[0]).href;
+        }
+
+
         monument = {
           id: doc.$id,
           name: doc.Route_name,
           photoUrl,
+          photoStartingPointUrl,
           userId: doc.userId // Assuming userID is part of the monument data
         };
 
@@ -60,11 +69,13 @@
         // Extract the quiz question and answers from the document
         quizDescription = doc.Description;
         quizRoute = doc.steps_in_route;
+        startingDescription = doc.startingPoint[1];
         dateMod = doc.dateModified.slice(0, 16).replace('T', ' ');
         quizQuestion = doc.quiz_question_answer[0]; 
         quizAnswers = doc.quiz_question_answer.slice(2);  
         quizCorrectAnswer = doc.quiz_question_answer[1];
 
+         
 
       } catch (error) {
         console.error('Error loading monument or user data:', error);
@@ -80,7 +91,7 @@
 
   // Function to go to the next page with a fly transition
   function nextPage() {
-    currentPage = (currentPage + 1) % 3;  // Move to the next page
+    currentPage = (currentPage + 1) % 4;  // Move to the next page
   }
     // Function to go back to the previous page with a fly transition
     function prevPage() {
@@ -132,8 +143,21 @@ function selectAnswer(answer: string) {
           </div>
         {/if}
 
+         <!-- New Second Page: Starting Point Photo and Description -->
+         {#if currentPage === 1}
+         <div in:fly={{ y: 100, duration: 500 }} out:fly={{ y: -100, duration: 500 }}>
+           <h2 class="text-xl font-bold">Starting Point</h2>
+           {#if monument.photoStartingPointUrl}
+             <figure class="my-4">
+               <img src={monument.photoStartingPointUrl} alt="Starting Point Photo" class="w-full max-w-lg mx-auto rounded-lg shadow" />
+             </figure>
+           {/if}
+           <p class="mt-4">{startingDescription}</p> <!-- Display the description -->
+         </div>
+       {/if}
+
         <!-- Second Page: Quiz Route -->
-        {#if currentPage === 1}
+        {#if currentPage === 2}
           <div in:fly={{ y: 100, duration: 500 }} out:fly={{ y: -100, duration: 500 }}>
             <h2 class="text-xl font-bold">Route to Find the Photo</h2>
             <ul class="list-disc pl-5 mt-4 space-y-2">
@@ -145,7 +169,7 @@ function selectAnswer(answer: string) {
         {/if}
 
         <!-- Third Page: Quiz Section -->
-        {#if currentPage === 2}
+        {#if currentPage === 3}
           <div in:fly={{ y: 100, duration: 500 }} out:fly={{ y: -100, duration: 500 }}>
             <h2 class="text-xl font-bold">Quiz</h2>
             {#if quizQuestion}
@@ -188,13 +212,13 @@ function selectAnswer(answer: string) {
         </button>
       {/if}
       <!-- Button to navigate between pages -->
-      {#if currentPage < 2}
+      {#if currentPage < 3}
         <button class="btn btn-secondary mt-4" on:click={nextPage}>
           Next
         </button>
       {/if}
        <!-- Display submit button only if an answer is selected and quiz has not been submitted -->
-       {#if !hasSubmitted && currentPage === 2}
+       {#if !hasSubmitted && currentPage === 3}
        {#if selectedAnswer}
          <button class="btn btn-primary mt-4" on:click={submitQuiz}>
            Submit

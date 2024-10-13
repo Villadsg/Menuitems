@@ -2,29 +2,20 @@
   import { account } from '$lib/appwrite';
   import { onMount } from 'svelte';
   import { writable } from 'svelte/store';
+  import { checkUser, user } from '$lib/userStore'; // Import from auth.ts
 
-  // Function to check user login status
-  const checkUser = async () => {
-    try {
-      const currentUser = await account.get();
-      return currentUser; // Return user object if logged in
-    } catch (error) {
-      return null; // Return null if no user is logged in
-    }
-  };
 
   // Writable store to manage the user state
   let userStatus = writable<Promise<null | object>>(null);
 
-  // Run checkUser when the component is mounted and store the promise
-  onMount(() => {
-    userStatus.set(checkUser());
+ onMount(() => {
+    checkUser(); // Check user login status when the component is mounted
   });
 
 </script>
 
 <!-- Home page content -->
-{#await $userStatus}
+{#await $user}
   <div class="flex items-center justify-center h-screen">
     <span class="loading loading-spinner loading-md"></span>
   </div>

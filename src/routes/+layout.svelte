@@ -4,6 +4,7 @@
     import { onMount } from 'svelte';
     import { account } from '$lib/appwrite';
 	  import { goto } from '$app/navigation';
+
    
 
     onMount(() => {

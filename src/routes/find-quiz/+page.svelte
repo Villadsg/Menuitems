@@ -1,69 +1,60 @@
 <script lang="ts">
+  import { getCurrentLocation, calculateDistance } from '$lib/location'; // Import location utilities
   import { account, databases, storage } from '$lib/appwrite'; // Import the initialized Appwrite client
   import { onMount } from 'svelte';
   import { writable } from 'svelte/store';
   import { goto } from '$app/navigation'; // Import the goto function from SvelteKit
   import { Query } from 'appwrite';
-  
-  // MonumentFinder logic
+  import DistanceCheck from '$lib/distanceCheck.svelte'; 
+  let showDistanceCheck = false; 
+  let selectedMonument = null; 
+
+  // State variables
   let status = '';
   let page = 'home';
-  const databaseId = '6609473fbde756e5dc45';  // Use your actual database ID
-  const collectionIdEnglish = '66eefaaf001c2777deb9';  // Use your actual collection ID
+  const databaseId = '6609473fbde756e5dc45';  
+  const collectionIdEnglish = '66eefaaf001c2777deb9';  
   const translatedCollectionId = '66fe6ac90010d9e9602f';
   const bucketId = '66efdb420000df196b64';
-  const userCollectionId = '66fbb317002371bfdffc';  // Use your actual user collection ID
-  let language = 'english';
+  const userCollectionId = '66fbb317002371bfdffc'; 
+  let language = 'english'; 
+  let latitude: number | null = null;
+  let longitude: number | null = null;
   let monuments = [];
   let sortedMonuments = [];
 
   // User-related code
   let userStatus = writable<Promise<null | object>>(null);
 
-    const checkUser = async () => {
-  try {
-    const currentUser = await account.get();
-    if (currentUser && currentUser.$id) {
-      // Fetch the user's langLearn attribute
-      try {
+  const checkUser = async () => {
+    try {
+      const currentUser = await account.get();
+      if (currentUser && currentUser.$id) {
+        // Fetch the user's langLearn attribute
         const userDoc = await databases.getDocument(databaseId, userCollectionId, currentUser.$id);
-        
-        language = userDoc.langLearn || 'english';
-        console.log(language) // Set language to the user's selected langLearn or default to English
-      } catch (error) {
-        console.error("Error fetching user document:", error);
+        language = userDoc.langLearn || 'english'; // Set language based on user's selection
+        return currentUser;
       }
-      return currentUser;
+      return null;
+    } catch (error) {
+      return null;
     }
-    return null; // No user logged in
-  } catch (error) {
-    return null; // Return null if no user is logged in
-  }
-};
-
- 
-
+  };
 
   const loadMonuments = async () => {
-    try {
-      const currentCollectionId = language === 'english' ? collectionIdEnglish : translatedCollectionId;
-    
-    // Load documents from the selected collection
+    const currentCollectionId = language === 'english' ? collectionIdEnglish : translatedCollectionId;
     const response = await databases.listDocuments(databaseId, currentCollectionId,
-     language === 'english' ? [] : [Query.equal("language", language)]
+      language === 'english' ? [] : [Query.equal('language', language)]
     );
 
+    monuments = await Promise.all(response.documents.map(async (doc) => {
+      let photoUrl = null;
+      let creator = 'unknown';
 
-      monuments = await Promise.all(response.documents.map(async (doc) => {
-        let photoUrl = null;
-        let creator = 'unknown';
+      if (doc.photoFileId) {
+        photoUrl = storage.getFilePreview(bucketId, doc.photoFileId).href;
+      }
 
-        if (doc.photoFileId) {
-          // Get the file preview URL from Appwrite storage
-          photoUrl = storage.getFilePreview(bucketId, doc.photoFileId).href;
-        }
-
-         // Fetch the creator's name
       if (doc.userId) {
         try {
           const userDoc = await databases.getDocument(databaseId, userCollectionId, doc.userId);
@@ -73,86 +64,72 @@
         }
       }
 
-        return {
-          id: doc.$id, // Include the document ID
-          name: doc.Route_name,
-          lat: doc.lat,
-          lng: doc.lng,
-          photoUrl,  // Include the photoUrl
-          dateModified: doc.dateModified.slice(0, 16).replace('T', ' '), 
-          creator
-        };
-      }));
+      return {
+        id: doc.$id,
+        name: doc.Route_name,
+        lat: parseFloat(doc.lat),
+        lng: parseFloat(doc.lng),
+        photoUrl,
+        dateModified: doc.dateModified.slice(0, 16).replace('T', ' '), 
+        creator
+      };
+    }));
+  };
+
+  const findLocation = async () => {
+    try {
+      const location = await getCurrentLocation(); // Get user's location
+      latitude = location.latitude;
+      longitude = location.longitude;
+      status = `Latitude: ${latitude}, Longitude: ${longitude}`;
+
+      sortedMonuments = monuments
+        .map(monument => {
+          const distance = calculateDistance(latitude, longitude, monument.lat, monument.lng);
+          return { ...monument, distance };
+        })
+        .sort((a, b) => a.distance - b.distance);
+
+      page = 'results';
     } catch (error) {
-      console.error("Error loading monuments:", error);
-    } 
-  };
-
-  // Calculate distance between two coordinates using the Haversine formula
-  function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
-    const R = 6371; // Earth's radius in km
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = 0.5 - Math.cos(dLat) / 2 + 
-              Math.cos(lat1 * Math.PI / 180) * 
-              Math.cos(lat2 * Math.PI / 180) * 
-              (1 - Math.cos(dLon)) / 2;
-    return R * 2 * Math.asin(Math.sqrt(a));
-  }
-
-  // Automatically find the user's location and sort nearby monuments
-  const findLocation = () => {
-    if (!navigator.geolocation) {
-      status = 'Geolocation is not supported by your browser';
-      return;
+      status = error.message;
     }
-    status = 'Locating…';
-    navigator.geolocation.getCurrentPosition(success, error);
   };
 
-  // Success callback when geolocation is retrieved
-  const success = (position: GeolocationPosition) => {
-    const latitude = position.coords.latitude;
-    const longitude = position.coords.longitude;
-    status = `Latitude: ${latitude}, Longitude: ${longitude}`;
-
-    // Calculate distances for all monuments
-    sortedMonuments = monuments
-      .map(monument => {
-        const distance = calculateDistance(latitude, longitude, monument.lat, monument.lng);
-        return { ...monument, distance };
-      })
-      // Sort by distance in ascending order
-      .sort((a, b) => a.distance - b.distance);
-
-    page = 'results';
-  };
-
-  // Error callback if geolocation fails
-  const error = () => {
-    status = 'Unable to retrieve your location';
-  };
-
-  // Function to handle monument selection
   const selectMonument = (monument) => {
-    // Navigate to the new page with the monument's ID
-    goto(`/play?id=${monument.id}&lang=${language}`);
+    if (monument.distance > 1) {
+      selectedMonument = monument; // Store the selected monument
+      showDistanceCheck = true; // Show the DistanceCheck component if the distance is greater than 1 km
+    } else {
+      // Navigate to the closest monument's quiz page
+      goto(`/play?id=${monument.id}&lang=${language}`);
+    }
   };
 
- 
-// On mount, fetch user info, load monuments, and find location
-onMount(async () => {
-    const user = await checkUser();  // First check the user and set language
+  onMount(async () => {
+    const user = await checkUser();
     userStatus.set(Promise.resolve(user));
-    await loadMonuments();  // Then load monuments based on the language
-    findLocation();  // Finally, find the user's location
+    await loadMonuments();
+    await findLocation();
   });
 
   function navigateTohome() {
     goto('/');
   }
 
+  const continueNavigation = () => {
+    showDistanceCheck = false; // Hide the DistanceCheck component
+    goto(`/play?id=${selectedMonument.id}&lang=${language}`); // Continue to the monument's quiz page
+  };
+
+  const cancelNavigation = () => {
+    showDistanceCheck = false; // Hide the DistanceCheck component and stay on the current page
+  };
+
 </script>
+{#if showDistanceCheck}
+  <DistanceCheck distance={selectedMonument.distance} onContinue={continueNavigation} onCancel={cancelNavigation} />
+{/if}
 
 <!-- User status and monument display -->
 {#await $userStatus}
@@ -179,7 +156,7 @@ onMount(async () => {
               {#if monument.photoUrl}
                 <img src="{monument.photoUrl}" alt="{monument.name}" class="my-2 max-w-xs rounded shadow" />
               {/if}
-              <p class="text-gray-500">Distance: {monument.distance.toFixed(2)} km</p>
+              <p class="text-gray-500">Distance to starting point: {monument.distance.toFixed(2)} km</p>
               <p class="text-gray-500">Date Modified: {monument.dateModified}</p>
               <p class="text-gray-500">Creator: {monument.creator}</p>
               <button

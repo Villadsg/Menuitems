@@ -3,22 +3,72 @@
   import { goto } from '$app/navigation';
   import { user } from '$lib/userStore';
   import { fly } from 'svelte/transition';
+  import { AppwriteService } from '$lib/appwriteService';
+  import { getCurrentLocation} from '$lib/location'; //
+  import { addItem } from '$lib/formHelpers';
 
   let routeName = '';
   let Description = '';
   let lat = '';
   let lng = '';
-  let route_description = [];
+  let route_description: string[] = [];
   let question = "";
-  let answers = [];
+  let answers: string[] = [];
   let correctAnswer = "";
   let message = '';
   let languages = ['ES','IT','DA','JA']; // Array to hold selected languages
   const currentDate = new Date().toISOString().slice(0, 16).replace('T', ' ');
+  let startingPoint: string[] = []; // New startingPoint array
+  let photoDescription = '';
 
-   
-  const addChoice = (index, event) => {
-    answers[index] = event.target.value;
+   // Separate variables for file uploads
+   let filesMainPhoto = null; // For the main photo
+  let filesStartingPointPhoto = null; // For the starting point photo
+
+  const translatedCollectionId = '66fe6ac90010d9e9602f'; // Adjust if necessary
+  let loading = false;
+
+  let bucketId = '66efdb420000df196b64';
+  const collectionId = '66eefaaf001c2777deb9';
+  
+  /** Function to upload the main photo */
+  const uploadMainPhoto = async () => {
+    try {
+      if (filesMainPhoto && filesMainPhoto.length > 0) {
+        const file = filesMainPhoto[0];
+        const response = await storage.createFile(bucketId, ID.unique(), file, [
+          Permission.read(Role.any()),
+          Permission.update(Role.user(userId)),
+          Permission.delete(Role.user(userId)),
+        ]);
+        return response.$id; // Return file ID for main photo
+      }
+    } catch (error) {
+      console.error('Failed to upload main photo:', error.message);
+      message = `Failed to upload main photo: ${error.message}`;
+      return null;
+    }
+  };
+
+   /** Function to upload the starting point photo */
+   const uploadStartingPointPhoto = async () => {
+    try {
+      if (filesStartingPointPhoto && filesStartingPointPhoto.length > 0) {
+        const file = filesStartingPointPhoto[0];
+        const response = await storage.createFile(bucketId, ID.unique(), file, [
+          Permission.read(Role.any()),
+          Permission.update(Role.user(userId)),
+          Permission.delete(Role.user(userId)),
+        ]);
+
+        // Add file ID and description to the startingPoint array
+        startingPoint = addItem(startingPoint, response.$id); // Add photo ID
+        startingPoint = addItem(startingPoint, photoDescription); // Add description
+      }
+    } catch (error) {
+      console.error('Failed to upload starting point photo:', error.message);
+      message = `Failed to upload starting point photo: ${error.message}`;
+    }
   };
 
   let currentPage = 'beginSection';
@@ -46,31 +96,30 @@
     }
   }
 
+
+
   const submitQuiz = async () => {
     try {
-      let fileId = null;
+    loading = true;
+       // Upload main photo
+       const mainPhotoFileId = await uploadMainPhoto();
+      if (!mainPhotoFileId) {
+        message = 'Main photo upload failed. Please try again.';
+        return;
+      }
 
-// Check if a photo is provided and store it in Appwrite after everything else is prepared
-if (files && files.length > 0) {
-  const file = files[0];
-  // Upload the file to Appwrite storage
-  const response = await storage.createFile(
-    bucketId,
-    ID.unique(),
-    file,
-    [
-      Permission.read(Role.any()),
-      Permission.update(Role.user(userId)),
-      Permission.delete(Role.user(userId))
-    ]
-  );
-  fileId = response.$id;
-}
+      // Upload starting point photo
+      await uploadStartingPointPhoto();
+      if (startingPoint.length === 0) {
+        message = 'No starting point photo uploaded. Please try again.';
+        return;
+      }
 
       const documentData = {
         dateModified: currentDate,
         Route_name: routeName,
         Description: Description,
+        startingPoint,
         lat: parseFloat(lat),
         lng: parseFloat(lng),
         steps_in_route: route_description,
@@ -80,20 +129,25 @@ if (files && files.length > 0) {
           ...answers.filter(answer => answer.trim() !== "")
         ],
         userId: userId,
-        ...(fileId && { photoFileId: fileId })
+        photoFileId: mainPhotoFileId, // Main photo file ID
       };
 
-      const originalDocument = await databases.createDocument(databaseId, collectionId, ID.unique(), documentData);
+      
+      const originalDocument = await AppwriteService.createDocument(collectionId, documentData);
       const originalDocumentId = originalDocument.$id;
 
       // Check if any languages were selected
       if (languages.length > 0) {
-        const translatedCollectionId = '66fe6ac90010d9e9602f'; // Adjust if necessary
+        
 
         // Loop through selected languages
         for (const languageCode of languages) {
           // Translate the inputs into the current language
           const translatedDescription = await translateText(Description, languageCode);
+          // Create the translated startingPoint array with the translated description
+          
+          const translatedstartingPoint = [startingPoint[0], await translateText(startingPoint[1], languageCode)];
+
           const translatedRouteDescriptions = await Promise.all(
             route_description.map(desc => translateText(desc, languageCode))
           );
@@ -108,6 +162,7 @@ if (files && files.length > 0) {
             ...documentData,
             Route_name: routeName,
             Description: translatedDescription,
+            startingPoint: translatedstartingPoint,
             steps_in_route: translatedRouteDescriptions,
             quiz_question_answer: [
               translatedQuestion,
@@ -119,11 +174,11 @@ if (files && files.length > 0) {
             lat: parseFloat(lat),
             lng: parseFloat(lng), 
             userId: userId,
-            ...(fileId && { photoFileId: fileId })
+            photoFileId: mainPhotoFileId, // Main photo file ID
           };
 
           // Save the translated document
-          await databases.createDocument(databaseId, translatedCollectionId, ID.unique(), translatedDocumentData);
+          await AppwriteService.createDocument(translatedCollectionId, translatedDocumentData);
         }
       }
 
@@ -133,32 +188,25 @@ if (files && files.length > 0) {
       }, 4000);
     } catch (error) {
       message = `Failed to create monument and quiz. Error: ${error.message}`;
-    }
+    } finally {
+    loading = false; // Hide spinner after loading is done
+  }
   };
 
-  let loading = false;
-  let files = null;
-  let bucketId = '66efdb420000df196b64';
-  const databaseId = '6609473fbde756e5dc45';
-  const collectionId = '66eefaaf001c2777deb9';
 
-  const getCurrentLocation = () => {
-    if (navigator.geolocation) {
-      loading = true;
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          lat = position.coords.latitude.toString();
-          lng = position.coords.longitude.toString();
-          loading = false;
-        },
-        (error) => {
-          console.error('Error getting location:', error.message);
-          message = 'Could not retrieve your location.';
-          loading = false;
-        }
-      );
-    } else {
-      message = 'Geolocation is not supported by your browser.';
+
+  // Updated function to use getCurrentLocation from location.ts
+  const fetchCurrentLocation = async () => {
+    try {
+      loading = true; // Set loading state to true
+      const location = await getCurrentLocation(); // Call getCurrentLocation from location.ts
+      lat = location.latitude.toString(); // Set latitude
+      lng = location.longitude.toString(); // Set longitude
+      loading = false;
+    } catch (error) {
+      console.error('Error getting location:', error.message);
+      message = 'Could not retrieve your location.';
+      loading = false;
     }
   };
 </script>
@@ -188,28 +236,36 @@ if (files && files.length > 0) {
             <input id="lng" type="number" step="any" bind:value={lng} placeholder="Enter Longitude" required class="input input-bordered w-full" />
           </div>
           
-          <button type="button" class="btn btn-outline w-full" on:click={getCurrentLocation} disabled={loading}>
+          <button type="button" class="btn btn-outline w-full" on:click={fetchCurrentLocation} disabled={loading}>
             {#if loading}
               <span class="loading loading-spinner"></span> Loading...
             {:else}
               Use Current Location
             {/if}
           </button>
-
-          
-         
           <button type="submit" class="btn btn-primary w-full">Next: add photo</button>
         </form>
         {:else if currentPage === 'photoSection'}
         <form on:submit|preventDefault={() => currentPage = 'routeSection'}  class="space-y-4 max-w-md mx-auto">
           <div>
-            <label for="photo" class="label">Upload or Take the Photo a user should find</label>
-            <p>Make sure it's unique within the area</p>
-            <input id="photo" type="file" bind:files={files} accept="image/*" capture="environment" required class="input input-bordered w-full" />
+            <h3 class="text-lg font-bold">Upload or Take the Main photo user should find</h3>
+            <label for="photo" class="label">Make sure it is unique in the area</label>
+            <input id="photo" type="file" bind:files={filesMainPhoto} accept="image/*" capture="environment" required class="input input-bordered w-full" />
           </div>
+
+          <h3 class="text-lg font-bold">Add Photo of Starting position</h3>
+          <label for="photo" class="label">Upload a photo for the starting point</label>
+          <input id="photo" type="file" bind:files={filesStartingPointPhoto} accept="image/*" required class="input input-bordered w-full" />
+          
+          <label for="photoDescription" class="label">Add description of the starting point</label>
+          <textarea id="photoDescription" bind:value={photoDescription} class="textarea textarea-bordered w-full" placeholder="Enter description"></textarea>
+          
 
           <button type="submit" class="btn btn-primary w-full">Next: add route to photo</button>
         </form>
+    
+ 
+
 
       {:else if currentPage === 'routeSection'}
         <!-- Second Section (Route Descriptions) -->
@@ -289,7 +345,14 @@ if (files && files.length > 0) {
         Add Option
       </button>
       
-        <button type="button" class="btn btn-success w-full" on:click={submitQuiz}>Submit Quiz</button>
+        <button type="button" class="btn btn-success w-full" on:click={submitQuiz}>
+          {#if loading}
+          <span class="loading loading-spinner mr-2"></span> Submitting...
+        {:else}
+          Submit Quiz
+        {/if}
+
+        </button>
       {:else if currentPage === 'confirmationPage'}
         <!-- Confirmation Page -->
         <div transition:fly={{ x: 200, duration: 300 }} class="space-y-4 max-w-md mx-auto text-center">
