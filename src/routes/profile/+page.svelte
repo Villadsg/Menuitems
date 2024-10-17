@@ -3,6 +3,7 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { user } from '$lib/userStore';
+  import CompletedRoutes from '$lib/completedtours.svelte'; // Adjust path if necessary
 
    // Make userId reactive
    $: userId = $user?.$id;
@@ -54,6 +55,7 @@
 
 </script>
 
+
 <!-- HTML Template -->
 <div class="flex justify-center items-center min-h-screen">
   <div class="text-center">
@@ -71,4 +73,6 @@
           See or Edit your created Tours
       </button>
   </div>
+
+  <CompletedRoutes />
 </div>
