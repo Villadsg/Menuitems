@@ -17,11 +17,10 @@
       <!-- About the Creator -->
       <h1 class="text-2xl font-bold mb-2">About the Creator</h1>
       <p class="text-gray-600 text-base mb-4">
-        Hi!
+        Hi I'm Villads!
   
       <p class="text-gray-600 text-base mb-4">
-        When I’m not coding or working on data projects, I love exploring new cultures, 
-        traveling, and constantly learning new things. Feel free to reach out and connect!
+        
       </p>
   
       <!-- Contact / Social Links -->
