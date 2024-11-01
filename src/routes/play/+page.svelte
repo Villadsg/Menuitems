@@ -156,20 +156,9 @@ function selectAnswer(answer: string) {
          </div>
        {/if}
 
-        <!-- Second Page: Quiz Route -->
-        {#if currentPage === 2}
-          <div in:fly={{ y: 100, duration: 500 }} out:fly={{ y: -100, duration: 500 }}>
-            <h2 class="text-xl font-bold">Route to Find the Photo</h2>
-            <ul class="list-disc pl-5 mt-4 space-y-2">
-              {#each quizRoute as step}
-                <li>{step}</li>
-              {/each}
-            </ul>
-          </div>
-        {/if}
 
         <!-- Third Page: Quiz Section -->
-        {#if currentPage === 3}
+        {#if currentPage === 2}
           <div in:fly={{ y: 100, duration: 500 }} out:fly={{ y: -100, duration: 500 }}>
             <h2 class="text-xl font-bold">Quiz</h2>
             {#if quizQuestion}

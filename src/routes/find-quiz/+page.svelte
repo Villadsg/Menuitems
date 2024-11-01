@@ -127,6 +127,8 @@
   };
 
 </script>
+
+<div class='pt-20'>
 {#if showDistanceCheck}
   <DistanceCheck distance={selectedMonument.distance} onContinue={continueNavigation} onCancel={cancelNavigation} />
 {/if}
@@ -140,13 +142,12 @@
   {#if user}
     <!-- Show MonumentFinder content when logged in -->
     {#if page !== 'results'}
-      <div class="flex items-center justify-center h-screen">
+      <div class="flex items-center justify-center h-screen ">
         <span class="loading loading-spinner loading-lg"></span>
       </div>
     {/if}
 
-    <!-- Results Page -->
-    {#if page === 'results'}
+
       <div class="max-w-4xl mx-auto p-6 bg-white rounded-lg shadow-md mt-8 pt-20">
         <h1>List of challenges nearby</h1>
         {#if sortedMonuments.length > 0}
@@ -178,11 +179,9 @@
         </button>
       </div>
     {/if}
-  {:else}
-    <div class="pt-20">
-      <p>Couldn't find any</p>
-    </div>
-  {/if}
+ 
 {:catch error}
   <div>Error loading user status: {error.message}</div>
 {/await}
+
+</div>

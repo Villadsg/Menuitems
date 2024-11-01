@@ -66,37 +66,33 @@
     }
   };
 
-  const confirmDelete = async () => {
-    if (monumentToDelete && confirmationName === monumentToDelete.Route_name) {
-      try {
-        // Delete associated photo if it exists
-        if (monumentToDelete.photoFileId) {
-          await storage.deleteFile('66efdb420000df196b64', monumentToDelete.photoFileId);
-        }
-
-        // Delete all copies of the monument from the translated collection
-        const copies = await databases.listDocuments(
-          databaseId,
-          translatedCollectionId,
-          [Query.equal('idOriginal', monumentToDelete.$id)]
-        );
-
-        for (const copy of copies.documents) {
-          await databases.deleteDocument(databaseId, translatedCollectionId, copy.$id);
-        }
-
-        // Delete the main monument document
-        await databases.deleteDocument(databaseId, collectionId, monumentToDelete.$id);
-        monumentToDelete = null;
-        confirmationName = '';    // Clear the input
-        await loadMonuments();    // Reload the monuments list
-      } catch (error) {
-        console.error('Error deleting monument:', error);
+  const confirmDelete = async (monument) => {
+  if (monument && confirmationName === monument.Route_name) {
+    try {
+      if (monument.photoFileId) {
+        await storage.deleteFile('66efdb420000df196b64', monument.photoFileId);
       }
-    } else {
-      errorMessage = "The name you entered doesn't match the monument.";
+
+      const copies = await databases.listDocuments(
+        databaseId,
+        translatedCollectionId,
+        [Query.equal('idOriginal', monument.$id)]
+      );
+
+      for (const copy of copies.documents) {
+        await databases.deleteDocument(databaseId, translatedCollectionId, copy.$id);
+      }
+
+      await databases.deleteDocument(databaseId, collectionId, monument.$id);
+      await loadMonuments();
+    } catch (error) {
+      console.error('Error deleting monument:', error);
     }
-  };
+  } else {
+    errorMessage = "The name you entered doesn't match the monument.";
+  }
+};
+
 
   const initiateDelete = (monument) => {
     monumentToDelete = monument;
@@ -324,9 +320,9 @@
           <div class="card-body">
             <h3 class="card-title">{monument.Route_name}</h3>
             <p><strong>Description:</strong> {monument.Description}</p>
-            <p>Date Modified: {monument.dateModified}</p>
+            <p>Date Modified: {monument.dateModified.slice(0, 16).replace('T', ' ')}</p>
             <div class="card-actions justify-end">
-              <button class="btn btn-outline btn-error" on:click={() => initiateDelete(monument)}>Delete</button>
+              <button class="btn btn-outline btn-error" on:click={() =>  confirmDelete(monument)}>Delete</button>
               <button class="btn btn-outline btn-primary ml-2" on:click={() => editMonument(monument)}>Edit</button>
             </div>
           </div>

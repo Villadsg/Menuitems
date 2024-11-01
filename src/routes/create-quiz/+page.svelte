@@ -4,26 +4,23 @@
   import { user } from '$lib/userStore';
   import { fly } from 'svelte/transition';
   import { AppwriteService } from '$lib/appwriteService';
-  import { getCurrentLocation} from '$lib/location'; //
-  import { addItem } from '$lib/formHelpers';
+  import { getCurrentLocation } from '$lib/location';
+  import exifr from 'exifr'; // Import exifr for EXIF data extraction
 
   let routeName = '';
   let Description = '';
   let lat = '';
   let lng = '';
-  let route_description: string[] = [];
   let question = "";
   let answers: string[] = [];
   let correctAnswer = "";
+  let showCoordinatesInput = false; 
   let message = '';
   let languages = ['ES','IT','DA','JA']; // Array to hold selected languages
   const currentDate = new Date().toISOString().slice(0, 16).replace('T', ' ');
-  let startingPoint: string[] = []; // New startingPoint array
-  let photoDescription = '';
 
-   // Separate variables for file uploads
-   let filesMainPhoto = null; // For the main photo
-  let filesStartingPointPhoto = null; // For the starting point photo
+  // Separate variables for file uploads
+  let filesMainPhoto = null; // For the main photo
 
   const translatedCollectionId = '66fe6ac90010d9e9602f'; // Adjust if necessary
   let loading = false;
@@ -31,6 +28,31 @@
   let bucketId = '66efdb420000df196b64';
   const collectionId = '66eefaaf001c2777deb9';
   
+ /** Function to extract coordinates from EXIF metadata */
+ const extractPhotoCoordinates = async (file) => {
+    try {
+      const metadata = await exifr.gps(file);
+      if (metadata && metadata.latitude && metadata.longitude) {
+        lat = metadata.latitude.toString();
+        lng = metadata.longitude.toString();
+        showCoordinatesInput = false; // Coordinates were found, no need to show inputs
+      } else {
+        showCoordinatesInput = true; // Coordinates missing, show inputs
+      }
+    } catch (error) {
+      console.error("Could not extract coordinates from photo:", error);
+      showCoordinatesInput = true; // Error, show inputs
+    }
+  };
+
+  /** Function to handle photo upload and extract coordinates */
+  const handlePhotoUpload = async (event) => {
+    filesMainPhoto = event.target.files;
+    if (filesMainPhoto && filesMainPhoto[0]) {
+      await extractPhotoCoordinates(filesMainPhoto[0]);
+    }
+  };
+
   /** Function to upload the main photo */
   const uploadMainPhoto = async () => {
     try {
@@ -41,7 +63,7 @@
           Permission.update(Role.user(userId)),
           Permission.delete(Role.user(userId)),
         ]);
-        return response.$id; // Return file ID for main photo
+        return response.$id;
       }
     } catch (error) {
       console.error('Failed to upload main photo:', error.message);
@@ -50,26 +72,6 @@
     }
   };
 
-   /** Function to upload the starting point photo */
-   const uploadStartingPointPhoto = async () => {
-    try {
-      if (filesStartingPointPhoto && filesStartingPointPhoto.length > 0) {
-        const file = filesStartingPointPhoto[0];
-        const response = await storage.createFile(bucketId, ID.unique(), file, [
-          Permission.read(Role.any()),
-          Permission.update(Role.user(userId)),
-          Permission.delete(Role.user(userId)),
-        ]);
-
-        // Add file ID and description to the startingPoint array
-        startingPoint = addItem(startingPoint, response.$id); // Add photo ID
-        startingPoint = addItem(startingPoint, photoDescription); // Add description
-      }
-    } catch (error) {
-      console.error('Failed to upload starting point photo:', error.message);
-      message = `Failed to upload starting point photo: ${error.message}`;
-    }
-  };
 
   let currentPage = 'beginSection';
   $: userId = $user?.$id;
@@ -96,33 +98,25 @@
     }
   }
 
-
-
   const submitQuiz = async () => {
     try {
-    loading = true;
-       // Upload main photo
-       const mainPhotoFileId = await uploadMainPhoto();
+      loading = true;
+      
+      // Upload main photo
+      const mainPhotoFileId = await uploadMainPhoto();
       if (!mainPhotoFileId) {
         message = 'Main photo upload failed. Please try again.';
         return;
       }
 
-      // Upload starting point photo
-      await uploadStartingPointPhoto();
-      if (startingPoint.length === 0) {
-        message = 'No starting point photo uploaded. Please try again.';
-        return;
-      }
+  
 
       const documentData = {
         dateModified: currentDate,
         Route_name: routeName,
         Description: Description,
-        startingPoint,
         lat: parseFloat(lat),
         lng: parseFloat(lng),
-        steps_in_route: route_description,
         quiz_question_answer: [
           question,
           correctAnswer,
@@ -132,25 +126,18 @@
         photoFileId: mainPhotoFileId, // Main photo file ID
       };
 
-      
       const originalDocument = await AppwriteService.createDocument(collectionId, documentData);
       const originalDocumentId = originalDocument.$id;
 
       // Check if any languages were selected
       if (languages.length > 0) {
-        
-
         // Loop through selected languages
         for (const languageCode of languages) {
           // Translate the inputs into the current language
           const translatedDescription = await translateText(Description, languageCode);
           // Create the translated startingPoint array with the translated description
-          
-          const translatedstartingPoint = [startingPoint[0], await translateText(startingPoint[1], languageCode)];
+        
 
-          const translatedRouteDescriptions = await Promise.all(
-            route_description.map(desc => translateText(desc, languageCode))
-          );
           const translatedQuestion = await translateText(question, languageCode);
           const translatedAnswers = await Promise.all(
             answers.map(ans => translateText(ans, languageCode))
@@ -162,8 +149,6 @@
             ...documentData,
             Route_name: routeName,
             Description: translatedDescription,
-            startingPoint: translatedstartingPoint,
-            steps_in_route: translatedRouteDescriptions,
             quiz_question_answer: [
               translatedQuestion,
               translatedCorrectAnswer,
@@ -189,11 +174,9 @@
     } catch (error) {
       message = `Failed to create monument and quiz. Error: ${error.message}`;
     } finally {
-    loading = false; // Hide spinner after loading is done
-  }
+      loading = false; // Hide spinner after loading is done
+    }
   };
-
-
 
   // Updated function to use getCurrentLocation from location.ts
   const fetchCurrentLocation = async () => {
@@ -217,16 +200,21 @@
     <div transition:fly={{ x: 200, duration: 300 }} class="space-y-4 max-w-md mx-auto">
       {#if currentPage === 'beginSection'}
         <!-- First Section (Monument Form) -->
-        <h1 class="text-2xl font-bold mb-4">Create Tour Challenge</h1>
-        <form on:submit|preventDefault={() => currentPage = 'photoSection'} class="space-y-4 max-w-md mx-auto">
+        <h1 class="text-2xl font-bold mb-4">Create and describe a photo to find</h1>
+        <form on:submit|preventDefault={() => currentPage = 'questionSection'} class="space-y-4 max-w-md mx-auto">
           <div>
-            <label for="routeName" class="label">Tour Name</label>
-            <input id="routeName" type="text" bind:value={routeName} placeholder="Enter Monument Name" required class="input input-bordered w-full" />
+            <label for="routeName" class="label">Name of Place</label>
+            <input id="routeName" type="text" bind:value={routeName} placeholder="'Best Bakery'" required class="input input-bordered w-full" />
           </div>
+
           <div>
-            <label for="Description" class="label">Description</label>
-            <textarea id="Description" bind:value={Description} placeholder="Enter Description" required class="textarea textarea-bordered w-full h-24"></textarea>
+            <h3 class="text-lg font-bold">Add photo</h3>
+            <input id="photo" type="file" bind:files={filesMainPhoto} accept="image/*" capture="environment" required class="input input-bordered w-full" on:change={handlePhotoUpload} />
           </div>
+
+          {#if showCoordinatesInput}
+          <h2 class="font-bold">Enter Coordinates Manually</h2>
+         
           <div>
             <label for="lat" class="label">Latitude</label>
             <input id="lat" type="number" step="any" bind:value={lat} placeholder="Enter Latitude" required class="input input-bordered w-full" />
@@ -235,7 +223,7 @@
             <label for="lng" class="label">Longitude</label>
             <input id="lng" type="number" step="any" bind:value={lng} placeholder="Enter Longitude" required class="input input-bordered w-full" />
           </div>
-          
+         
           <button type="button" class="btn btn-outline w-full" on:click={fetchCurrentLocation} disabled={loading}>
             {#if loading}
               <span class="loading loading-spinner"></span> Loading...
@@ -243,66 +231,18 @@
               Use Current Location
             {/if}
           </button>
-          <button type="submit" class="btn btn-primary w-full">Next: add photo</button>
-        </form>
-        {:else if currentPage === 'photoSection'}
-        <form on:submit|preventDefault={() => currentPage = 'routeSection'}  class="space-y-4 max-w-md mx-auto">
+          {/if}
+          
           <div>
-            <h3 class="text-lg font-bold">Upload or Take the Main photo user should find</h3>
-            <label for="photo" class="label">Make sure it is unique in the area</label>
-            <input id="photo" type="file" bind:files={filesMainPhoto} accept="image/*" capture="environment" required class="input input-bordered w-full" />
+            <label for="Description" class="label">Photo Description</label>
+            <textarea id="Description" bind:value={Description} placeholder="'When I was here this happened'" required class="textarea textarea-bordered w-full h-24"></textarea>
           </div>
-
-          <h3 class="text-lg font-bold">Add Photo of Starting position</h3>
-          <label for="photo" class="label">Upload a photo for the starting point</label>
-          <input id="photo" type="file" bind:files={filesStartingPointPhoto} accept="image/*" required class="input input-bordered w-full" />
-          
-          <label for="photoDescription" class="label">Add description of the starting point</label>
-          <textarea id="photoDescription" bind:value={photoDescription} class="textarea textarea-bordered w-full" placeholder="Enter description"></textarea>
-          
-
-          <button type="submit" class="btn btn-primary w-full">Next: add route to photo</button>
+         
+          <button type="submit" class="btn btn-primary w-full">Next: add quiz question</button>
         </form>
-    
- 
 
-
-      {:else if currentPage === 'routeSection'}
-        <!-- Second Section (Route Descriptions) -->
-        <form on:submit|preventDefault={() => currentPage = 'questionSection'}  class="space-y-4 max-w-md mx-auto">
-          <h2 class="text-xl font-bold">Add Route Descriptions</h2>
-          <h3 class="text-lg">Add steps in your route to the photo:</h3>
-          
-          {#each route_description as step, index}
-  <div class="flex items-center space-x-2">
-    <input 
-      type="text" 
-      bind:value={route_description[index]} 
-      class="input input-bordered w-full" 
-      placeholder="Enter step"
-    />
-    <button 
-      type="button" 
-      class="btn btn-outline btn-error" 
-      on:click={() => route_description = route_description.filter((_, i) => i !== index)}
-    >
-      Remove
-    </button>
-  </div>
-{/each}
-<button 
-  type="button" 
-  class="btn btn-outline mt-2" 
-  on:click={() => route_description = [...route_description, '']}
->
-  Add Step
-</button>
-
-      
-          <button type="submit" class="btn btn-primary w-full">Next: Add Quiz Question</button>
-        </form>
       {:else if currentPage === 'questionSection'}
-        <!-- Third Section (Quiz Question Form) -->
+        <!-- Quiz Question Form -->
         <h2 class="text-xl font-bold">Add Quiz Question</h2>
         <div>
           <label for="question" class="label">Quiz Question</label>
@@ -310,48 +250,47 @@
         </div>
         <h3 class="text-lg font-bold">Add answer options in the multiple choice:</h3>
         {#each answers as answer, index}
-  <div class="flex items-center space-x-2">
-    <!-- Answer input -->
-    <input 
-      type="text" 
-      bind:value={answers[index]} 
-      class="input input-bordered w-full" 
-      placeholder="Enter answer option"
-    />
-    
-    <!-- Radio button for marking the correct answer -->
-    <input 
-      type="radio" 
-      name="correctAnswer" 
-      value={answers[index]} 
-      checked={correctAnswer === answers[index]} 
-      on:change={() => correctAnswer = answers[index]}
-    />
-    
-    <button 
-      type="button" 
-      class="btn btn-outline btn-error" 
-      on:click={() => answers = answers.filter((_, i) => i !== index)}
-    >
-      Remove
-    </button>
-  </div>
-{/each}
-      <button 
-        type="button" 
-        class="btn btn-outline mt-2" 
-        on:click={() => answers = [...answers, '']}
-      >
-        Add Option
-      </button>
-      
+          <div class="flex items-center space-x-2">
+            <!-- Answer input -->
+            <input 
+              type="text" 
+              bind:value={answers[index]} 
+              class="input input-bordered w-full" 
+              placeholder="Enter answer option"
+            />
+            
+            <!-- Radio button for marking the correct answer -->
+            <input 
+              type="radio" 
+              name="correctAnswer" 
+              value={answers[index]} 
+              checked={correctAnswer === answers[index]} 
+              on:change={() => correctAnswer = answers[index]}
+            />
+            
+            <button 
+              type="button" 
+              class="btn btn-outline btn-error" 
+              on:click={() => answers = answers.filter((_, i) => i !== index)}
+            >
+              Remove
+            </button>
+          </div>
+        {/each}
+        <button 
+          type="button" 
+          class="btn btn-outline mt-2" 
+          on:click={() => answers = [...answers, '']}
+        >
+          Add Option
+        </button>
+        
         <button type="button" class="btn btn-success w-full" on:click={submitQuiz}>
           {#if loading}
           <span class="loading loading-spinner mr-2"></span> Submitting...
         {:else}
           Submit Quiz
         {/if}
-
         </button>
       {:else if currentPage === 'confirmationPage'}
         <!-- Confirmation Page -->
