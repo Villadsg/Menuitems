@@ -24,8 +24,6 @@
     lng: '',
     photoFileId: '',
     Description: '',
-    startingPoint: ['', ''], // Ensures that startingPoint has both photoFileId and description
-    steps_in_route: [''],
     quiz_question_answer: ['']
   };
 
@@ -85,6 +83,12 @@
 
       await databases.deleteDocument(databaseId, collectionId, monument.$id);
       await loadMonuments();
+
+       // Close the modal after successful deletion
+       monumentToDelete = null;
+      confirmationName = '';  // Reset the confirmation name input
+      errorMessage = ''; 
+      
     } catch (error) {
       console.error('Error deleting monument:', error);
     }
@@ -109,8 +113,6 @@
       lng: monument.lng,
       photoFileId: monument.photoFileId,
       Description: monument.Description || '',
-      startingPoint: monument.startingPoint || ['', ''], // Ensure photoFileId and description in startingPoint
-      steps_in_route: monument.steps_in_route || [],
       quiz_question_answer: monument.quiz_question_answer || []
     };
   };
@@ -151,8 +153,6 @@
       // Translate and create new documents for each language
       for (const [language, code] of Object.entries(targetLangs)) {
         const translatedDescription = await translateText(updatedData.Description, code);
-        const translatedStartingPoint = [updatedData.startingPoint[0], await translateText(updatedData.startingPoint[1], code)];
-        const translatedSteps = await Promise.all(updatedData.steps_in_route.map(step => translateText(step, code)));
         const translatedAnswers = await Promise.all(updatedData.quiz_question_answer.map(answer => translateText(answer, code)));
 
         await databases.createDocument(databaseId, translatedCollectionId, ID.unique(), {
@@ -164,8 +164,6 @@
           userId,
           photoFileId: editMonumentData.photoFileId,
           Description: translatedDescription,
-          startingPoint: translatedStartingPoint, // Use translated starting point description
-          steps_in_route: translatedSteps,
           quiz_question_answer: translatedAnswers,
           dateModified: currentDate
         });
@@ -212,13 +210,6 @@
     await loadMonuments();
   });
 
-  const modifySteps = (action, index) => {
-    if (action === 'add') {
-      editMonumentData.steps_in_route = [...editMonumentData.steps_in_route, ''];
-    } else if (action === 'remove' && index !== null) {
-      editMonumentData.steps_in_route = editMonumentData.steps_in_route.filter((_, i) => i !== index);
-    }
-  };
 
   const modifyAnswers = (action, index) => {
     if (action === 'add') {
@@ -231,7 +222,7 @@
 
 <!-- Edit Monument Form -->
 <div class="pt-20 max-w-lg mx-auto">
-  <h1 class="text-3xl font-bold mb-4">My Tours</h1>
+  <h1 class="text-3xl font-bold mb-4">My Locations</h1>
   {#if message}
     <div class="alert alert-error shadow-lg">
       <div>{message}</div>
@@ -270,21 +261,7 @@
             <textarea bind:value={editMonumentData.Description} class="textarea textarea-bordered" required></textarea>
           </div>
 
-          <div class="form-control">
-            <span class="label-text">Starting Point Description</span>
-            <textarea bind:value={editMonumentData.startingPoint[1]} class="textarea textarea-bordered" required></textarea>
-          </div>
 
-          <div class="form-control">
-            <span class="label-text">Steps in Route</span>
-            {#each editMonumentData.steps_in_route as step, index}
-              <div class="flex items-center space-x-2">
-                <input type="text" bind:value={editMonumentData.steps_in_route[index]} class="input input-bordered w-full" placeholder="Enter step" />
-                <button type="button" class="btn btn-outline btn-error" on:click={() => modifySteps('remove', index)}>Remove</button>
-              </div>
-            {/each}
-            <button type="button" class="btn btn-outline mt-2" on:click={() => modifySteps('add', null)}>Add Step</button>
-          </div>
 
           <div class="form-control">
             <span class="label-text">Quiz Question Answers</span>
@@ -322,7 +299,7 @@
             <p><strong>Description:</strong> {monument.Description}</p>
             <p>Date Modified: {monument.dateModified.slice(0, 16).replace('T', ' ')}</p>
             <div class="card-actions justify-end">
-              <button class="btn btn-outline btn-error" on:click={() =>  confirmDelete(monument)}>Delete</button>
+              <button class="btn btn-outline btn-error" on:click={() =>  initiateDelete(monument)}>Delete</button>
               <button class="btn btn-outline btn-primary ml-2" on:click={() => editMonument(monument)}>Edit</button>
             </div>
           </div>
@@ -331,3 +308,27 @@
     </ul>
   {/if}
 </div>
+
+<!-- Delete Confirmation Modal -->
+{#if monumentToDelete}
+  <div class="modal modal-open">
+    <div class="modal-box">
+      <h3 class="font-bold text-lg">Confirm Delete</h3>
+      <p>Are you sure you want to delete {monumentToDelete.Route_name}?</p>
+      <p>Enter the name <strong>{monumentToDelete.Route_name}</strong> to confirm:</p>
+      <input
+        type="text"
+        bind:value={confirmationName}
+        placeholder="Enter name to confirm"
+        class="input input-bordered w-full mt-2"
+      />
+      {#if errorMessage}
+        <p class="text-red-500 mt-2">{errorMessage}</p>
+      {/if}
+      <div class="modal-action">
+        <button class="btn btn-error" on:click={() => confirmDelete(monumentToDelete)}>Delete</button>
+        <button class="btn" on:click={() => monumentToDelete = null}>Cancel</button>
+      </div>
+    </div>
+  </div>
+{/if}

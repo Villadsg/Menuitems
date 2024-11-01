@@ -1,112 +1,95 @@
 <script lang="ts">
-  import { fly } from 'svelte/transition';  // Import the fly transition
-  import { databases, storage } from '$lib/appwrite'; // Import Appwrite services
-  import { page } from '$app/stores'; // To access the query parameters
+  import { fly } from 'svelte/transition';
+  import { databases, storage } from '$lib/appwrite';
+  import { page } from '$app/stores';
   import { onMount } from 'svelte';
-  
-  let monument: string;  // Object to store monument details
+
+  let monument: string;
   let quizQuestion = "";
-  let quizCorrectAnswer = "";   // Store the correct quiz answer
-  let quizAnswers: string [] = [];   // Array to store the quiz answers
+  let quizCorrectAnswer = "";
+  let quizAnswers: string[] = [];
   let dateMod = Date();
-  let selectedAnswer = "";  // Variable to store the user's selected answer
-  let hasSubmitted = false;  // Variable to track if the user has submitted the quiz
+  let selectedAnswer = "";
+  let hasSubmitted = false;
   let isCorrect = false;
-  let quizRoute: string [] = [];
+  let quizRoute: string[] = [];
   let startingDescription = "";
   let quizDescription = "";
-  let currentPage = 0;  // Variable to track the current page for the fly transition
-  let userNameChangable = ""; // Variable to store the fetched userNameChangable attribute
+  let currentPage = 0;
+  let userNameChangable = "";
   let stillLoading = true;
+
   onMount(async () => {
     const params = new URLSearchParams($page.url.search);
-    const id = params.get('id');  // Get monument ID from query params
+    const id = params.get('id');
     const lang = params.get('lang');
-    console.log(lang)
+
     if (id) {
-      const databaseId = '6609473fbde756e5dc45';  // Your actual database ID for monuments
-      const collectionId = '66eefaaf001c2777deb9';  // Your actual collection ID for monuments
-      const bucketId = '66efdb420000df196b64';  // Your actual storage bucket ID
-      const userCollectionId = '66fbb317002371bfdffc'; // Collection ID for users
+      const databaseId = '6609473fbde756e5dc45';
+      const collectionId = '66eefaaf001c2777deb9';
+      const bucketId = '66efdb420000df196b64';
+      const userCollectionId = '66fbb317002371bfdffc';
       const translatedCollectionId = "66fe6ac90010d9e9602f";
-      
 
       try {
-        
         const currentCollectionId = lang === 'english' || lang === null ? collectionId : translatedCollectionId;
-        // Fetch the monument document by ID
         const doc = await databases.getDocument(databaseId, currentCollectionId, id);
-
-        
 
         let photoUrl = null;
         let photoStartingPointUrl = null;
 
         if (doc.photoFileId) {
-          // Get the file preview URL from Appwrite storage
           photoUrl = storage.getFilePreview(bucketId, doc.photoFileId).href;
         }
 
-      
-        // Get the starting point photo URL using the first value in the quizStartingPoint array
         if (doc.startingPoint[0]) {
           photoStartingPointUrl = storage.getFilePreview(bucketId, doc.startingPoint[0]).href;
         }
-
 
         monument = {
           id: doc.$id,
           name: doc.Route_name,
           photoUrl,
           photoStartingPointUrl,
-          userId: doc.userId // Assuming userID is part of the monument data
+          userId: doc.userId
         };
 
-        // Fetch the user's document by their userID to get userNameChangable
         const userDoc = await databases.getDocument(databaseId, userCollectionId, monument.userId);
         userNameChangable = userDoc.userNameChangable;
 
-        // Extract the quiz question and answers from the document
         quizDescription = doc.Description;
         quizRoute = doc.steps_in_route;
         startingDescription = doc.startingPoint[1];
         dateMod = doc.dateModified.slice(0, 16).replace('T', ' ');
-        quizQuestion = doc.quiz_question_answer[0]; 
-        quizAnswers = doc.quiz_question_answer.slice(2);  
+        quizQuestion = doc.quiz_question_answer[0];
+        quizAnswers = doc.quiz_question_answer.slice(2);
         quizCorrectAnswer = doc.quiz_question_answer[1];
-
-         
 
       } catch (error) {
         console.error('Error loading monument or user data:', error);
         monument = null;
-        
       }
     } else {
       monument = null;
-     
     }
     stillLoading = false;
   });
 
-  // Function to go to the next page with a fly transition
   function nextPage() {
-    currentPage = (currentPage + 1) % 4;  // Move to the next page
+    currentPage = (currentPage + 1) % 2;
   }
-    // Function to go back to the previous page with a fly transition
-    function prevPage() {
+
+  function prevPage() {
     if (currentPage > 0) {
-      currentPage = (currentPage - 1);  // Move to the previous page
+      currentPage = (currentPage - 1);
     }
   }
 
-  // Function to handle answer selection
-function selectAnswer(answer: string) {
-  selectedAnswer = answer;
-  hasSubmitted = false;  // Reset hasSubmitted to allow resubmission
-}
+  function selectAnswer(answer: string) {
+    selectedAnswer = answer;
+    hasSubmitted = false;
+  }
 
-  // Function to handle quiz submission
   function submitQuiz() {
     if (selectedAnswer) {
       hasSubmitted = true;
@@ -114,21 +97,17 @@ function selectAnswer(answer: string) {
     }
   }
 </script>
-<!-- HTML Layout for Fly Transition Pages -->
-<div class="pt-20">
 
-  
+<div class="pt-20">
   {#if stillLoading}
-  <div class="flex items-center justify-center h-screen">
-    <span class="loading loading-spinner loading-lg"></span>
-  </div>
- {/if}
+    <div class="flex items-center justify-center h-screen">
+      <span class="loading loading-spinner loading-lg"></span>
+    </div>
+  {/if}
 
   {#if monument}
     <div class="card max-w-4xl mx-auto p-6 bg-base-100 shadow-xl mt-8">
-
       {#key currentPage}
-        <!-- First Page: Photo, Route Name, and Description -->
         {#if currentPage === 0}
           <div in:fly={{ y: 100, duration: 500 }} out:fly={{ y: -100, duration: 500 }}>
             <h1 class="text-3xl font-bold">{monument.name}</h1>
@@ -143,27 +122,11 @@ function selectAnswer(answer: string) {
           </div>
         {/if}
 
-         <!-- New Second Page: Starting Point Photo and Description -->
-         {#if currentPage === 1}
-         <div in:fly={{ y: 100, duration: 500 }} out:fly={{ y: -100, duration: 500 }}>
-           <h2 class="text-xl font-bold">Starting Point</h2>
-           {#if monument.photoStartingPointUrl}
-             <figure class="my-4">
-               <img src={monument.photoStartingPointUrl} alt="Starting Point Photo" class="w-full max-w-lg mx-auto rounded-lg shadow" />
-             </figure>
-           {/if}
-           <p class="mt-4">{startingDescription}</p> <!-- Display the description -->
-         </div>
-       {/if}
-
-
-        <!-- Third Page: Quiz Section -->
-        {#if currentPage === 2}
+        {#if currentPage === 1}
           <div in:fly={{ y: 100, duration: 500 }} out:fly={{ y: -100, duration: 500 }}>
             <h2 class="text-xl font-bold">Quiz</h2>
             {#if quizQuestion}
               <p class="mt-4 text-lg">{quizQuestion}</p>
-
               <ul class="mt-4 space-y-2">
                 {#each quizAnswers as answer}
                   <button 
@@ -176,10 +139,6 @@ function selectAnswer(answer: string) {
                 {/each}
               </ul>
 
-              
-
-
-              <!-- Display result after submission -->
               {#if hasSubmitted}
                 <div class="alert mt-4 {isCorrect ? 'alert-success' : 'alert-error'}">
                   <span>{isCorrect ? 'Correct answer!' : 'Wrong answer. Try again!'}</span>
@@ -192,29 +151,17 @@ function selectAnswer(answer: string) {
         {/if}
       {/key}
 
-    
-                  <div>
-        <!-- Back Button -->
-      {#if currentPage !== 0}
-        <button class="btn btn-secondary mb-4" on:click={prevPage}>
-          Back
-        </button>
-      {/if}
-      <!-- Button to navigate between pages -->
-      {#if currentPage < 3}
-        <button class="btn btn-secondary mt-4" on:click={nextPage}>
-          Next
-        </button>
-      {/if}
-       <!-- Display submit button only if an answer is selected and quiz has not been submitted -->
-       {#if !hasSubmitted && currentPage === 3}
-       {#if selectedAnswer}
-         <button class="btn btn-primary mt-4" on:click={submitQuiz}>
-           Submit
-         </button>
-       {/if}
-     {/if}
-                  </div>
+      <div>
+        {#if currentPage !== 0}
+          <button class="btn btn-secondary mb-4" on:click={prevPage}>Back</button>
+        {/if}
+        {#if currentPage < 1}
+          <button class="btn btn-secondary mt-4" on:click={nextPage}>Next</button>
+        {/if}
+        {#if !hasSubmitted && currentPage === 1 && selectedAnswer}
+          <button class="btn btn-primary mt-4" on:click={submitQuiz}>Submit</button>
+        {/if}
+      </div>
     </div>
   {:else}
     <div class="alert alert-error mt-8 text-center">
@@ -222,4 +169,3 @@ function selectAnswer(answer: string) {
     </div>
   {/if}
 </div>
-
