@@ -3,6 +3,7 @@
   import { databases, storage } from '$lib/appwrite';
   import { page } from '$app/stores';
   import { onMount } from 'svelte';
+  import { goto } from '$app/navigation'; // Import the goto function
 
   let monument: string;
   let quizQuestion = "";
@@ -12,59 +13,50 @@
   let selectedAnswer = "";
   let hasSubmitted = false;
   let isCorrect = false;
-  let quizRoute: string[] = [];
-  let startingDescription = "";
   let quizDescription = "";
   let currentPage = 0;
   let userNameChangable = "";
   let stillLoading = true;
 
+  const databaseId = '6609473fbde756e5dc45';
+  const collectionId = '66eefaaf001c2777deb9';
+  const bucketId = '66efdb420000df196b64';
+  const userCollectionId = '66fbb317002371bfdffc';
+  let userId = "";  // to be populated with the current user’s ID
+
   onMount(async () => {
     const params = new URLSearchParams($page.url.search);
     const id = params.get('id');
-    const lang = params.get('lang');
 
     if (id) {
-      const databaseId = '6609473fbde756e5dc45';
-      const collectionId = '66eefaaf001c2777deb9';
-      const bucketId = '66efdb420000df196b64';
-      const userCollectionId = '66fbb317002371bfdffc';
-      const translatedCollectionId = "66fe6ac90010d9e9602f";
-
       try {
-        const currentCollectionId = lang === 'english' || lang === null ? collectionId : translatedCollectionId;
-        const doc = await databases.getDocument(databaseId, currentCollectionId, id);
+        const doc = await databases.getDocument(databaseId, collectionId, id);
 
         let photoUrl = null;
-        let photoStartingPointUrl = null;
-
         if (doc.photoFileId) {
           photoUrl = storage.getFilePreview(bucketId, doc.photoFileId).href;
         }
 
-        if (doc.startingPoint[0]) {
-          photoStartingPointUrl = storage.getFilePreview(bucketId, doc.startingPoint[0]).href;
-        }
+      
 
         monument = {
           id: doc.$id,
           name: doc.Route_name,
           photoUrl,
-          photoStartingPointUrl,
           userId: doc.userId
         };
 
+        // Fetch the user document
         const userDoc = await databases.getDocument(databaseId, userCollectionId, monument.userId);
         userNameChangable = userDoc.userNameChangable;
+        userId = userDoc.$id; // store user ID for later use
 
         quizDescription = doc.Description;
-        quizRoute = doc.steps_in_route;
-        startingDescription = doc.startingPoint[1];
         dateMod = doc.dateModified.slice(0, 16).replace('T', ' ');
         quizQuestion = doc.quiz_question_answer[0];
         quizAnswers = doc.quiz_question_answer.slice(2);
         quizCorrectAnswer = doc.quiz_question_answer[1];
-
+        
       } catch (error) {
         console.error('Error loading monument or user data:', error);
         monument = null;
@@ -90,12 +82,39 @@
     hasSubmitted = false;
   }
 
-  function submitQuiz() {
-    if (selectedAnswer) {
-      hasSubmitted = true;
-      isCorrect = selectedAnswer === quizCorrectAnswer;
+  async function submitQuiz() {
+  if (selectedAnswer) {
+    hasSubmitted = true;
+    isCorrect = selectedAnswer === quizCorrectAnswer;
+
+    if (isCorrect) {
+      try {
+        // Fetch user document to get the current locationsDone array
+        const userDoc = await databases.getDocument(databaseId, userCollectionId, userId);
+        let locationsDone = userDoc.locationsDone || [];
+
+        // Create a JSON string representation of the monument data
+        const locationEntry = JSON.stringify({ id: monument.id, Route_name: monument.name });
+
+        // Check if this entry is already in locationsDone
+        if (!locationsDone.includes(locationEntry)) {
+          locationsDone.push(locationEntry);
+
+          // Update the user document with the new locationsDone array
+          await databases.updateDocument(databaseId, userCollectionId, userId, {
+            locationsDone: locationsDone,
+          });
+        }
+        
+        // Redirect to the profile page after a correct answer
+        goto('/profile');
+      } catch (error) {
+        console.error('Error updating locationsDone:', error);
+      }
     }
   }
+}
+
 </script>
 
 <div class="pt-20">

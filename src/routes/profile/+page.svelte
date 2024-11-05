@@ -66,10 +66,11 @@
             </button>
         </div>
   
-        <!-- Completed Routes Section -->
-        <div class="p-6 flex-grow">
-            <CompletedRoutes />
-        </div>
+    <!-- Profile Page -->
+<div class="p-6 flex-grow">
+    <CompletedRoutes {userId} />
+</div>
+
     </div>
   </div>
   

@@ -6,7 +6,8 @@
   import { AppwriteService } from '$lib/appwriteService';
   import { getCurrentLocation } from '$lib/location';
   import exifr from 'exifr'; // Import exifr for EXIF data extraction
-
+  import { compressImage } from '$lib/compress'; 
+ 
   let routeName = '';
   let Description = '';
   let lat = '';
@@ -19,46 +20,58 @@
   let languages = ['ES','IT','DA','JA']; // Array to hold selected languages
   const currentDate = new Date().toISOString().slice(0, 16).replace('T', ' ');
 
-  // Separate variables for file uploads
-  let filesMainPhoto = null; // For the main photo
+  let filesMainPhoto: File[] | null = null;
+  let compressedFile: File | null = null;
 
-  const translatedCollectionId = '66fe6ac90010d9e9602f'; // Adjust if necessary
   let loading = false;
 
   let bucketId = '66efdb420000df196b64';
   const collectionId = '66eefaaf001c2777deb9';
   
- /** Function to extract coordinates from EXIF metadata */
- const extractPhotoCoordinates = async (file) => {
+  /** Function to extract coordinates from EXIF metadata */
+  const extractPhotoCoordinates = async (file: File) => {
     try {
       const metadata = await exifr.gps(file);
       if (metadata && metadata.latitude && metadata.longitude) {
         lat = metadata.latitude.toString();
         lng = metadata.longitude.toString();
-        showCoordinatesInput = false; // Coordinates were found, no need to show inputs
+        showCoordinatesInput = false;
       } else {
-        showCoordinatesInput = true; // Coordinates missing, show inputs
+        showCoordinatesInput = true;
       }
     } catch (error) {
       console.error("Could not extract coordinates from photo:", error);
-      showCoordinatesInput = true; // Error, show inputs
+      showCoordinatesInput = true;
     }
   };
 
-  /** Function to handle photo upload and extract coordinates */
-  const handlePhotoUpload = async (event) => {
-    filesMainPhoto = event.target.files;
+ /** Function to handle photo upload and compression */
+ const handlePhotoUpload = async (event: Event) => {
+    const input = event.target as HTMLInputElement;
+    filesMainPhoto = input.files ? Array.from(input.files) : null;
+
     if (filesMainPhoto && filesMainPhoto[0]) {
-      await extractPhotoCoordinates(filesMainPhoto[0]);
+      const originalFile = filesMainPhoto[0];
+
+      // Extract coordinates
+      await extractPhotoCoordinates(originalFile);
+
+      // Compress the photo
+      try {
+        compressedFile = await compressImage(originalFile);
+      } catch (error) {
+        message = 'Failed to compress the photo.';
+        compressedFile = null;
+      }
     }
   };
 
   /** Function to upload the main photo */
   const uploadMainPhoto = async () => {
     try {
-      if (filesMainPhoto && filesMainPhoto.length > 0) {
-        const file = filesMainPhoto[0];
-        const response = await storage.createFile(bucketId, ID.unique(), file, [
+      if (compressedFile) {
+
+        const response = await storage.createFile(bucketId, ID.unique(), compressedFile, [
           Permission.read(Role.any()),
           Permission.update(Role.user(userId)),
           Permission.delete(Role.user(userId)),
@@ -67,7 +80,7 @@
       }
     } catch (error) {
       console.error('Failed to upload main photo:', error.message);
-      message = `Failed to upload main photo: ${error.message}`;
+      message = `Failed to upload main photo: ${error.message};`
       return null;
     }
   };
@@ -117,6 +130,8 @@
         Description: Description,
         lat: parseFloat(lat),
         lng: parseFloat(lng),
+        language: 'EN',
+        idOriginal: 'Main',
         quiz_question_answer: [
           question,
           correctAnswer,
@@ -163,7 +178,7 @@
           };
 
           // Save the translated document
-          await AppwriteService.createDocument(translatedCollectionId, translatedDocumentData);
+          await AppwriteService.createDocument(collectionId, translatedDocumentData);
         }
       }
 
@@ -172,7 +187,7 @@
         goto('/');
       }, 4000);
     } catch (error) {
-      message = `Failed to create monument and quiz. Error: ${error.message}`;
+      message = `Failed to create monument and quiz. Error: ${error.message};`
     } finally {
       loading = false; // Hide spinner after loading is done
     }
@@ -193,6 +208,8 @@
     }
   };
 </script>
+
+
 
 <!-- Wrapper div -->
 <div class="pt-20">

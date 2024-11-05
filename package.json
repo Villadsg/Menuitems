@@ -35,6 +35,7 @@
 	"type": "module",
 	"dependencies": {
 		"appwrite": "^15.0.0",
+		"browser-image-compression": "^2.0.2",
 		"daisyui": "^4.12.10",
 		"deepl-node": "^1.14.0",
 		"exifr": "^7.1.3",

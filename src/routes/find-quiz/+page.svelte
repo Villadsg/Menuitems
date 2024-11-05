@@ -13,8 +13,8 @@
   let status = '';
   let page = 'home';
   const databaseId = '6609473fbde756e5dc45';  
-  const collectionIdEnglish = '66eefaaf001c2777deb9';  
-  const translatedCollectionId = '66fe6ac90010d9e9602f';
+  const collectionId = '66eefaaf001c2777deb9';  
+
   const bucketId = '66efdb420000df196b64';
   const userCollectionId = '66fbb317002371bfdffc'; 
   let language = 'english'; 
@@ -42,9 +42,8 @@
   };
 
   const loadMonuments = async () => {
-    const currentCollectionId = language === 'english' ? collectionIdEnglish : translatedCollectionId;
-    const response = await databases.listDocuments(databaseId, currentCollectionId,
-      language === 'english' ? [] : [Query.equal('language', language)]
+    const response = await databases.listDocuments(databaseId, collectionId,
+    [Query.equal('language', language)]
     );
 
     monuments = await Promise.all(response.documents.map(async (doc) => {
@@ -102,7 +101,7 @@
       showDistanceCheck = true; // Show the DistanceCheck component if the distance is greater than 1 km
     } else {
       // Navigate to the closest monument's quiz page
-      goto(`/play?id=${monument.id}&lang=${language}`);
+      goto(`/play?id=${monument.id}`);
     }
   };
 
@@ -119,7 +118,7 @@
 
   const continueNavigation = () => {
     showDistanceCheck = false; // Hide the DistanceCheck component
-    goto(`/play?id=${selectedMonument.id}&lang=${language}`); // Continue to the monument's quiz page
+    goto(`/play?id=${selectedMonument.id}`); // Continue to the monument's quiz page
   };
 
   const cancelNavigation = () => {
@@ -127,41 +126,58 @@
   };
 
 </script>
+<div class="pt-20">
+  {#if showDistanceCheck}
+    <DistanceCheck
+      distance={selectedMonument.distance}
+      onContinue={continueNavigation}
+      onCancel={cancelNavigation}
+    />
+  {/if}
 
-<div class='pt-20'>
-{#if showDistanceCheck}
-  <DistanceCheck distance={selectedMonument.distance} onContinue={continueNavigation} onCancel={cancelNavigation} />
-{/if}
+  {#await $userStatus}
+    <!-- Loading state while fetching user status -->
+    <div class="flex items-center justify-center min-h-screen">
+      <span class="loading loading-spinner loading-lg"></span>
+    </div>
+  {:then user}
+    {#if user}
+      <!-- Only show monument content if on a relevant page -->
+      {#if page !== 'results'}
+        <div class="flex items-center justify-center min-h-screen">
+          <span class="loading loading-spinner loading-lg"></span>
+        </div>
+      {/if}
 
-<!-- User status and monument display -->
-{#await $userStatus}
-  <div class="flex items-center justify-center h-screen">
-    <span class="loading loading-spinner loading-md"></span>
-  </div>
-{:then user}
-  {#if user}
-    <!-- Show MonumentFinder content when logged in -->
-    {#if page !== 'results'}
-      <div class="flex items-center justify-center h-screen ">
-        <span class="loading loading-spinner loading-lg"></span>
-      </div>
-    {/if}
-
-
-      <div class="max-w-4xl mx-auto p-6 bg-white rounded-lg shadow-md mt-8 pt-20">
-        <h1>List of challenges nearby</h1>
+      <!-- Main content container -->
+      <div class="max-w-4xl mx-auto p-6 bg-base-100 rounded-lg shadow-lg mt-10">
+        
         {#if sortedMonuments.length > 0}
+          <h1 class="text-2xl font-bold mb-6 text-center">List of Challenges Nearby</h1>
           {#each sortedMonuments as monument}
-            <div class="mb-4 p-4 bg-gray-100 rounded shadow">
-              <h3 class="text-xl font-semibold text-gray-800">{monument.name}</h3>
+            <div class="mb-6 p-5 bg-base-200 rounded-lg shadow">
+              <h3 class="text-xl font-semibold text-base-content mb-2">{monument.name}</h3>
+              
               {#if monument.photoUrl}
-                <img src="{monument.photoUrl}" alt="{monument.name}" class="my-2 max-w-xs rounded shadow" />
+                <img
+                  src="{monument.photoUrl}"
+                  alt="{monument.name}"
+                  class="my-3 max-w-xs rounded shadow mx-auto"
+                />
               {/if}
-              <p class="text-gray-500">Distance to starting point: {monument.distance.toFixed(2)} km</p>
-              <p class="text-gray-500">Date Modified: {monument.dateModified}</p>
-              <p class="text-gray-500">Creator: {monument.creator}</p>
+              
+              <p class="text-gray-500">
+                Distance to starting point: <span class="font-semibold">{monument.distance.toFixed(2)} km</span>
+              </p>
+              <p class="text-gray-500">
+                Date Modified: <span class="font-semibold">{monument.dateModified}</span>
+              </p>
+              <p class="text-gray-500">
+                Creator: <span class="font-semibold">{monument.creator}</span>
+              </p>
+              
               <button
-                class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 mt-2"
+                class="btn btn-success w-full mt-3"
                 on:click={() => selectMonument(monument)}
               >
                 Select
@@ -169,19 +185,21 @@
             </div>
           {/each}
         {:else}
-          <p>No monuments found.</p>
+          <p class="text-center text-gray-500">No monuments found.</p>
         {/if}
+        
         <button
-          class="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400 mt-4"
+          class="btn btn-outline w-full mt-6"
           on:click={navigateTohome}
         >
           Back to Home
         </button>
       </div>
     {/if}
- 
-{:catch error}
-  <div>Error loading user status: {error.message}</div>
-{/await}
-
+    
+  {:catch error}
+    <div class="flex items-center justify-center min-h-screen text-error">
+      Error loading user status: {error.message}
+    </div>
+  {/await}
 </div>

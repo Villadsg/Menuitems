@@ -1,59 +1,58 @@
 <script lang="ts">
-    import { onMount } from 'svelte';
-    import { databases } from '$lib/appwrite';
-    import { user } from '$lib/userStore';
-  
-    // Database and collection identifiers
-    const databaseId = '6609473fbde756e5dc45';
-    const collectionId = '66eefaaf001c2777deb9'; // English collection or adjust for translated ones
-  
-    let completedRoutes = [];
-    let loading = true;
-    let errorMessage = '';
-  
-    $: userId = $user?.$id;
-  
-    // Fetch the completed routes based on the user's answered quizzes
-    const fetchCompletedRoutes = async () => {
-      if (!userId) return;
-  
-      try {
-        const response = await databases.listDocuments(databaseId, collectionId, [
-          Query.equal('userId', userId), // Fetch routes for the current user
-          Query.equal('completed', true), // Filter where the user has completed the final quiz question
-        ]);
-  
-        completedRoutes = response.documents.map((doc) => ({
-          routeName: doc.Route_name,
-          dateCompleted: doc.dateModified.slice(0, 16).replace('T', ' '),
-        }));
-      } catch (error) {
-        errorMessage = 'Failed to load completed routes.';
-      } finally {
-        loading = false;
-      }
-    };
-  
-    // Load the data when the component mounts
-    onMount(fetchCompletedRoutes);
-  </script>
-  
-  {#if loading}
-    <div class="loading loading-spinner loading-lg"></div>
-  {:else if errorMessage}
-    <p class="text-red-500">{errorMessage}</p>
-  {:else if completedRoutes.length > 0}
-    <div class="completed-routes-list">
-      <h2 class="text-lg font-semibold mb-4">Completed Routes:</h2>
-      <ul class="list-disc pl-5">
-        {#each completedRoutes as route}
-          <li>
-            <span class="font-bold">{route.routeName}</span> - Completed on: {route.dateCompleted}
-          </li>
-        {/each}
-      </ul>
-    </div>
+  import { goto } from '$app/navigation';
+  import { onMount } from 'svelte';
+  import { databases } from '$lib/appwrite';
+
+  export let userId: string; // Pass the userId as a prop
+  const databaseId = '6609473fbde756e5dc45';
+  const userCollectionId = '66fbb317002371bfdffc';
+
+  let locationsDone = [];
+
+  onMount(async () => {
+    try {
+      // Fetch the user document to get the locationsDone array
+      const userDoc = await databases.getDocument(databaseId, userCollectionId, userId);
+      
+      locationsDone = userDoc.locationsDone.map((item) => JSON.parse(item)); // Parse JSON strings back into objects
+    } catch (error) {
+      console.error('Error loading completed routes:', error);
+    }
+  });
+
+  function navigateToPlay(id: string) {
+    goto(`/play?id=${id}`);
+  }
+</script>
+
+<div class="completed-routes">
+  <h2 class="text-2xl font-bold mb-4">Completed Routes</h2>
+
+  {#if locationsDone.length > 0}
+    <ul>
+      {#each locationsDone as location}
+        <li class="mb-2 flex items-center">
+          <span class="mr-4">{location.Route_name}</span>
+          <button 
+            class="btn btn-primary"
+            on:click={() => navigateToPlay(location.id)}
+          >
+            Play
+          </button>
+        </li>
+      {/each}
+    </ul>
   {:else}
-    <p>No completed routes yet.</p>
+    <p>No routes completed yet.</p>
   {/if}
-  
+</div>
+
+<style>
+  .completed-routes {
+    max-width: 600px;
+    margin: auto;
+    padding: 20px;
+    background-color: #f9f9f9;
+    border-radius: 8px;
+  }
+</style>

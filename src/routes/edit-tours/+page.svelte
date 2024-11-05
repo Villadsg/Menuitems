@@ -4,6 +4,8 @@
   import { onMount } from 'svelte';
   import { Query } from 'appwrite';
 
+
+  let deleteLoading = false; // New variable for delete loading spinner
   let loading = false;
   let monuments = [];
   let message = '';
@@ -13,7 +15,6 @@
 
   const databaseId = '6609473fbde756e5dc45';
   const collectionId = '66eefaaf001c2777deb9';
-  const translatedCollectionId = '66fe6ac90010d9e9602f';
   $: userId = $user?.$id;
 
   let isEditing = false;
@@ -26,6 +27,16 @@
     Description: '',
     quiz_question_answer: ['']
   };
+
+  let newPhotoFile = null;
+
+  function handleFileChange(event) {
+  const file = event.target.files[0];
+  if (file) {
+    newPhotoFile = file;
+  }
+}
+
 
   /** Function to translate text */
   async function translateText(text: string, targetLang: string) {
@@ -49,12 +60,14 @@
     }
   }
 
+  
+
   const loadMonuments = async () => {
     try {
       const response = await databases.listDocuments(
         databaseId,
         collectionId,
-        [Query.equal('userId', userId)]
+        [Query.equal('userId', userId),Query.equal('language', 'EN')]
       );
       monuments = response.documents;
       message = monuments.length === 0 ? 'No monument tours created yet.' : '';
@@ -66,6 +79,7 @@
 
   const confirmDelete = async (monument) => {
   if (monument && confirmationName === monument.Route_name) {
+    deleteLoading = true;
     try {
       if (monument.photoFileId) {
         await storage.deleteFile('66efdb420000df196b64', monument.photoFileId);
@@ -73,12 +87,12 @@
 
       const copies = await databases.listDocuments(
         databaseId,
-        translatedCollectionId,
+        collectionId,
         [Query.equal('idOriginal', monument.$id)]
       );
 
       for (const copy of copies.documents) {
-        await databases.deleteDocument(databaseId, translatedCollectionId, copy.$id);
+        await databases.deleteDocument(databaseId, collectionId, copy.$id);
       }
 
       await databases.deleteDocument(databaseId, collectionId, monument.$id);
@@ -91,7 +105,9 @@
       
     } catch (error) {
       console.error('Error deleting monument:', error);
-    }
+    } finally {
+        deleteLoading = false; // Reset delete loading after the delete operation completes
+      }
   } else {
     errorMessage = "The name you entered doesn't match the monument.";
   }
@@ -122,10 +138,26 @@
       loading = true;
       const currentDate = new Date().toISOString();
 
-      const { id, ...updatedData } = editMonumentData;
-      updatedData.dateModified = currentDate;
-      updatedData.lat = parseFloat(editMonumentData.lat);
-      updatedData.lng = parseFloat(editMonumentData.lng);
+      if (compressedFile) {
+      // Delete the old photo if it exists
+      if (editMonumentData.photoFileId) {
+        await storage.deleteFile('66efdb420000df196b64', editMonumentData.photoFileId);
+      }
+
+      // Upload the compressed photo and update photoFileId
+      const uploadResponse = await storage.createFile('66efdb420000df196b64', ID.unique(), compressedFile);
+      editMonumentData.photoFileId = uploadResponse.$id;
+
+      // Reset compressedFile after upload
+      compressedFile = null;
+    }
+
+    // Set lat/lng from CompressAndLocation component
+    const { id, ...updatedData } = editMonumentData;
+    updatedData.dateModified = currentDate;
+    updatedData.lat = parseFloat(editMonumentData.lat);
+    updatedData.lng = parseFloat(editMonumentData.lng);
+
 
       // Update the original monument
       await databases.updateDocument(databaseId, collectionId, id, updatedData);
@@ -133,13 +165,13 @@
       // Fetch all translated copies
       const copies = await databases.listDocuments(
         databaseId,
-        translatedCollectionId,
+        collectionId,
         [Query.equal('idOriginal', id)]
       );
 
       // Delete existing translations
       for (const copy of copies.documents) {
-        await databases.deleteDocument(databaseId, translatedCollectionId, copy.$id);
+        await databases.deleteDocument(databaseId, collectionId, copy.$id);
       }
 
       // Language codes for translations
@@ -155,7 +187,7 @@
         const translatedDescription = await translateText(updatedData.Description, code);
         const translatedAnswers = await Promise.all(updatedData.quiz_question_answer.map(answer => translateText(answer, code)));
 
-        await databases.createDocument(databaseId, translatedCollectionId, ID.unique(), {
+        await databases.createDocument(databaseId, collectionId, ID.unique(), {
           idOriginal: id,
           language: code,
           Route_name: editMonumentData.Route_name,
@@ -218,6 +250,11 @@
       editMonumentData.quiz_question_answer = editMonumentData.quiz_question_answer.filter((_, i) => i !== index);
     }
   };
+
+    // Function to set a potential answer as correct by updating index 1
+    function setCorrectAnswer(index: number) {
+    editMonumentData.quiz_question_answer[1] = editMonumentData.quiz_question_answer[index];
+  }
 </script>
 
 <!-- Edit Monument Form -->
@@ -244,6 +281,13 @@
 
           <div class="form-control">
             <label class="label">
+              <span class="label-text">Upload New Photo</span>
+              <input type="file" accept="image/*" on:change={handleFileChange} class="input input-bordered" />
+            </label>
+          </div>
+
+          <div class="form-control">
+            <label class="label">
               <span class="label-text">Latitude</span>
               <input type="number" step="any" bind:value={editMonumentData.lat} class="input input-bordered" required />
             </label>
@@ -264,11 +308,19 @@
 
 
           <div class="form-control">
-            <span class="label-text">Quiz Question Answers</span>
-            {#each editMonumentData.quiz_question_answer as answer, index}
-              <div class="flex items-center space-x-2">
-                <input type="text" bind:value={editMonumentData.quiz_question_answer[index]} class="input input-bordered w-full" placeholder="Enter answer" />
-                <button type="button" class="btn btn-outline btn-error" on:click={() => modifyAnswers('remove', index)}>Remove</button>
+            <span class="label-text">Quiz Question and Answers</span>
+          
+            <!-- Display the Question -->
+            <div class="flex items-center space-x-2">
+              <input type="text" bind:value={editMonumentData.quiz_question_answer[0]} class="input input-bordered w-full" placeholder="Enter question" />
+              <span class="text-gray-500">Question</span>
+            </div>
+          
+            <!-- Display Potential Answers -->
+            {#each editMonumentData.quiz_question_answer.slice(2) as answer, index}
+              <div class="flex items-center space-x-2 mt-2">
+                <input type="text" bind:value={editMonumentData.quiz_question_answer[index + 2]} class="input input-bordered w-full" placeholder="Enter answer option" />
+                <button type="button" class="btn btn-outline" on:click={() => setCorrectAnswer(index + 2)}>Set as Correct</button>
               </div>
             {/each}
             <button type="button" class="btn btn-outline mt-2" on:click={() => modifyAnswers('add', null)}>Add Answer</button>
@@ -326,7 +378,13 @@
         <p class="text-red-500 mt-2">{errorMessage}</p>
       {/if}
       <div class="modal-action">
-        <button class="btn btn-error" on:click={() => confirmDelete(monumentToDelete)}>Delete</button>
+        <button class="btn btn-error" on:click={() => confirmDelete(monumentToDelete)} disabled={deleteLoading}>
+          {#if deleteLoading}
+            <span class="loading loading-spinner mr-2"></span> Deleting...
+          {:else}
+            Delete
+          {/if}
+        </button>
         <button class="btn" on:click={() => monumentToDelete = null}>Cancel</button>
       </div>
     </div>
