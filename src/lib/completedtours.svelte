@@ -34,7 +34,7 @@
         <li class="mb-2 flex items-center">
           <span class="mr-4">{location.Route_name}</span>
           <button 
-            class="btn btn-primary"
+             class="btn btn-success mt-3"
             on:click={() => navigateToPlay(location.id)}
           >
             Play

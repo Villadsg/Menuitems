@@ -3,6 +3,8 @@
   import { user } from '$lib/userStore';
   import { onMount } from 'svelte';
   import { Query } from 'appwrite';
+  import { compressImage } from '$lib/compress'; // Import the compress function
+
 
 
   let deleteLoading = false; // New variable for delete loading spinner
@@ -30,12 +32,16 @@
 
   let newPhotoFile = null;
 
-  function handleFileChange(event) {
-  const file = event.target.files[0];
-  if (file) {
-    newPhotoFile = file;
+  async function handleFileChange(event) {
+    const file = event.target.files[0];
+    if (file) {
+      try {
+        newPhotoFile = await compressImage(file); // Compress the file
+      } catch (error) {
+        console.error('Image compression failed:', error);
+      }
+    }
   }
-}
 
 
   /** Function to translate text */
@@ -138,25 +144,20 @@
       loading = true;
       const currentDate = new Date().toISOString();
 
-      if (compressedFile) {
+      if (newPhotoFile) {
       // Delete the old photo if it exists
       if (editMonumentData.photoFileId) {
         await storage.deleteFile('66efdb420000df196b64', editMonumentData.photoFileId);
       }
 
       // Upload the compressed photo and update photoFileId
-      const uploadResponse = await storage.createFile('66efdb420000df196b64', ID.unique(), compressedFile);
+      const uploadResponse = await storage.createFile('66efdb420000df196b64', ID.unique(), newPhotoFile);
       editMonumentData.photoFileId = uploadResponse.$id;
 
       // Reset compressedFile after upload
-      compressedFile = null;
+      newPhotoFile = null;
     }
 
-    // Set lat/lng from CompressAndLocation component
-    const { id, ...updatedData } = editMonumentData;
-    updatedData.dateModified = currentDate;
-    updatedData.lat = parseFloat(editMonumentData.lat);
-    updatedData.lng = parseFloat(editMonumentData.lng);
 
 
       // Update the original monument

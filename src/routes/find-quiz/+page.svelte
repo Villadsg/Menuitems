@@ -126,7 +126,7 @@
   };
 
 </script>
-<div class="pt-20">
+<div class="space-y-4 max-w-md mx-auto pt-20">
   {#if showDistanceCheck}
     <DistanceCheck
       distance={selectedMonument.distance}

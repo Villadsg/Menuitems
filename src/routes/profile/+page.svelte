@@ -54,13 +54,13 @@
             <p class="text-gray-600 mb-4">Welcome to your profile page.</p>
   
             <button 
-                class="btn btn-primary mt-2 w-full" 
+                class="btn btn-success w-full mt-2" 
                 on:click={navigateToEditProfile}>
                 Edit your profile
             </button>
   
             <button 
-                class="btn btn-primary mt-2 w-full" 
+            class="btn btn-success w-full mt-2" 
                 on:click={navigateToEditTours}>
                 See or Edit your created Tours
             </button>

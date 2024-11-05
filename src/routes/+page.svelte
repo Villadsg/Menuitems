@@ -23,7 +23,7 @@
   {#if user}
     <!-- Show MonumentFinder component when logged in -->
     <div class="pt-20">
-      <p>Here is some interesting info and news </p>
+      <p>Here is some interesting info and news. For example a map of all the nearby photos </p>
     </div>
   {:else}
     <!-- Background image section using Tailwind CSS for not logged-in users -->

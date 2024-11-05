@@ -255,7 +255,7 @@
             <textarea id="Description" bind:value={Description} placeholder="'When I was here this happened'" required class="textarea textarea-bordered w-full h-24"></textarea>
           </div>
          
-          <button type="submit" class="btn btn-primary w-full">Next: add quiz question</button>
+          <button type="submit"  class="btn btn-success w-full mt-3">Next: add quiz question</button>
         </form>
 
       {:else if currentPage === 'questionSection'}
