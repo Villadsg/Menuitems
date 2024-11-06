@@ -17,7 +17,6 @@
 
   const databaseId = '6609473fbde756e5dc45';
   const collectionIdEnglish = '66eefaaf001c2777deb9';
-  const translatedCollectionId = '66fe6ac90010d9e9602f'; 
   const bucketId = '66efdb420000df196b64';
 
   const submitLanguage = async () => {
@@ -53,8 +52,7 @@
 
   // Load monuments from the Appwrite database
   const loadMonuments = async () => {
-    const currentCollectionId = language === 'english' ? collectionIdEnglish : translatedCollectionId;
-    const response = await databases.listDocuments(databaseId, currentCollectionId,
+    const response = await databases.listDocuments(databaseId, collectionIdEnglish,
       language === 'english' ? [] : [Query.equal('language', language)]
     );
     monuments = await Promise.all(response.documents.map(async (doc) => {

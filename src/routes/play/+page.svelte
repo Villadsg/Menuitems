@@ -93,8 +93,9 @@
         const userDoc = await databases.getDocument(databaseId, userCollectionId, userId);
         let locationsDone = userDoc.locationsDone || [];
 
+        const completionDate = new Date().toISOString().slice(0, 10);
         // Create a JSON string representation of the monument data
-        const locationEntry = JSON.stringify({ id: monument.id, Route_name: monument.name });
+        const locationEntry = JSON.stringify({ id: monument.id, Route_name: monument.name, Date: completionDate });
 
         // Check if this entry is already in locationsDone
         if (!locationsDone.includes(locationEntry)) {

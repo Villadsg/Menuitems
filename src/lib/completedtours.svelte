@@ -10,15 +10,18 @@
   let locationsDone = [];
 
   onMount(async () => {
-    try {
-      // Fetch the user document to get the locationsDone array
-      const userDoc = await databases.getDocument(databaseId, userCollectionId, userId);
-      
-      locationsDone = userDoc.locationsDone.map((item) => JSON.parse(item)); // Parse JSON strings back into objects
-    } catch (error) {
-      console.error('Error loading completed routes:', error);
-    }
-  });
+  try {
+    // Fetch the user document to get the locationsDone array
+    const userDoc = await databases.getDocument(databaseId, userCollectionId, userId);
+    
+    locationsDone = userDoc.locationsDone
+      .map((item) => JSON.parse(item)) // Parse JSON strings back into objects
+      .sort((a, b) => new Date(b.Date).getTime() - new Date(a.Date).getTime()); // Sort by date in descending order
+  } catch (error) {
+    console.error('Error loading completed routes:', error);
+  }
+});
+
 
   function navigateToPlay(id: string) {
     goto(`/play?id=${id}`);
@@ -39,6 +42,7 @@
           >
             Play
           </button>
+          <span>{location.Date}</span>
         </li>
       {/each}
     </ul>
