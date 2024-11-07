@@ -45,26 +45,34 @@
     }
   };
 
- /** Function to handle photo upload and compression */
- const handlePhotoUpload = async (event: Event) => {
-    const input = event.target as HTMLInputElement;
-    filesMainPhoto = input.files ? Array.from(input.files) : null;
+  const handlePhotoUpload = async (event: Event) => {
+  const input = event.target as HTMLInputElement;
+  filesMainPhoto = input.files; // Assign directly without converting to an array
 
-    if (filesMainPhoto && filesMainPhoto[0]) {
-      const originalFile = filesMainPhoto[0];
+  if (filesMainPhoto && filesMainPhoto[0]) {
+    const originalFile = filesMainPhoto[0];
 
-      // Extract coordinates
-      await extractPhotoCoordinates(originalFile);
+    // Extract coordinates from EXIF metadata
+    await extractPhotoCoordinates(originalFile);
 
-      // Compress the photo
-      try {
-        compressedFile = await compressImage(originalFile);
-      } catch (error) {
-        message = 'Failed to compress the photo.';
-        compressedFile = null;
+    // If no coordinates found, prompt to use current location
+    if (showCoordinatesInput) {
+      const useLocation = confirm("Photo has no GPS data. Would you like to use your current location?");
+      if (useLocation) {
+        await fetchCurrentLocation();
       }
     }
-  };
+
+    // Compress the photo
+    try {
+      compressedFile = await compressImage(originalFile);
+    } catch (error) {
+      message = 'Failed to compress the photo.';
+      compressedFile = null;
+    }
+  }
+};
+
 
   /** Function to upload the main photo */
   const uploadMainPhoto = async () => {
