@@ -226,7 +226,16 @@
 
           <div>
             <h3 class="text-lg font-bold">Add photo</h3>
-            <input id="photo" type="file" bind:files={filesMainPhoto} accept="image/*" capture="environment" required class="input input-bordered w-full" on:change={handlePhotoUpload} />
+            <input 
+              id="photo" 
+              type="file" 
+              bind:files={filesMainPhoto} 
+              accept="image/*" 
+              capture="environment" 
+              required 
+              class="input input-bordered w-full" 
+              on:change={handlePhotoUpload} 
+            />
           </div>
 
           {#if showCoordinatesInput}

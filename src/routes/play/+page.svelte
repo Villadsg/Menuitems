@@ -27,13 +27,19 @@
 
   onMount(async () => {
     try {
-      const session = await account.get();
-      isLoggedIn = !!session;  // Set the login status
-      userId = session.userId; // Store the user ID if logged in
-    } catch (error) {
+    const session = await account.get();
+    if (session) {
+      userId = session.$id;
+      console.log("User ID in play page:", userId); // Check if this logs correctly
+      isLoggedIn = true;
+    } else {
       console.log("User is not logged in");
       isLoggedIn = false;
     }
+  } catch (error) {
+    console.error("Error fetching session:", error);
+    isLoggedIn = false;
+  }
 
     const params = new URLSearchParams($page.url.search);
     const id = params.get('id');
