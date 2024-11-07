@@ -20,7 +20,7 @@
   let languages = ['ES','IT','DA','JA']; // Array to hold selected languages
   const currentDate = new Date().toISOString().slice(0, 16).replace('T', ' ');
 
-  let filesMainPhoto: File[] | null = null;
+  let filesMainPhoto: FileList | null = null;
   let compressedFile: File | null = null;
 
   let loading = false;
@@ -231,7 +231,6 @@
               type="file" 
               bind:files={filesMainPhoto} 
               accept="image/*" 
-              capture="environment" 
               required 
               class="input input-bordered w-full" 
               on:change={handlePhotoUpload} 
