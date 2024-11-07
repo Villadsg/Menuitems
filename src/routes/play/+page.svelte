@@ -1,9 +1,9 @@
 <script lang="ts">
   import { fly } from 'svelte/transition';
-  import { databases, storage } from '$lib/appwrite';
+  import { databases, storage, account } from '$lib/appwrite';
   import { page } from '$app/stores';
   import { onMount } from 'svelte';
-  import { goto } from '$app/navigation'; // Import the goto function
+  import { goto } from '$app/navigation';
 
   let monument: string;
   let quizQuestion = "";
@@ -17,6 +17,7 @@
   let currentPage = 0;
   let userNameChangable = "";
   let stillLoading = true;
+  let isLoggedIn = false;
 
   const databaseId = '6609473fbde756e5dc45';
   const collectionId = '66eefaaf001c2777deb9';
@@ -25,6 +26,15 @@
   let userId = "";  // to be populated with the current user’s ID
 
   onMount(async () => {
+    try {
+      const session = await account.get();
+      isLoggedIn = !!session;  // Set the login status
+      userId = session.userId; // Store the user ID if logged in
+    } catch (error) {
+      console.log("User is not logged in");
+      isLoggedIn = false;
+    }
+
     const params = new URLSearchParams($page.url.search);
     const id = params.get('id');
 
@@ -37,8 +47,6 @@
           photoUrl = storage.getFilePreview(bucketId, doc.photoFileId).href;
         }
 
-      
-
         monument = {
           id: doc.$id,
           name: doc.Route_name,
@@ -46,17 +54,18 @@
           userId: doc.userId
         };
 
-        // Fetch the user document
-        const userDoc = await databases.getDocument(databaseId, userCollectionId, monument.userId);
-        userNameChangable = userDoc.userNameChangable;
-        userId = userDoc.$id; // store user ID for later use
+        // Fetch user document if the user is logged in
+        if (isLoggedIn) {
+          const userDoc = await databases.getDocument(databaseId, userCollectionId, monument.userId);
+          userNameChangable = userDoc.userNameChangable;
+        }
 
         quizDescription = doc.Description;
         dateMod = doc.dateModified.slice(0, 16).replace('T', ' ');
         quizQuestion = doc.quiz_question_answer[0];
         quizAnswers = doc.quiz_question_answer.slice(2);
         quizCorrectAnswer = doc.quiz_question_answer[1];
-        
+
       } catch (error) {
         console.error('Error loading monument or user data:', error);
         monument = null;
@@ -83,40 +92,42 @@
   }
 
   async function submitQuiz() {
-  if (selectedAnswer) {
-    hasSubmitted = true;
-    isCorrect = selectedAnswer === quizCorrectAnswer;
+    if (!isLoggedIn) {
+      alert("Please log in to submit your quiz.");
+      goto('/login'); // Redirect to the login page if not logged in
+      return;
+    }
 
-    if (isCorrect) {
-      try {
-        // Fetch user document to get the current locationsDone array
-        const userDoc = await databases.getDocument(databaseId, userCollectionId, userId);
-        let locationsDone = userDoc.locationsDone || [];
+    if (selectedAnswer) {
+      hasSubmitted = true;
+      isCorrect = selectedAnswer === quizCorrectAnswer;
 
-        const completionDate = new Date().toISOString().slice(0, 10);
-        // Create a JSON string representation of the monument data
-        const locationEntry = JSON.stringify({ id: monument.id, Route_name: monument.name, Date: completionDate });
+      if (isCorrect) {
+        try {
+          // Fetch user document to get the current locationsDone array
+          const userDoc = await databases.getDocument(databaseId, userCollectionId, userId);
+          let locationsDone = userDoc.locationsDone || [];
 
-        // Check if this entry is already in locationsDone
-        if (!locationsDone.includes(locationEntry)) {
-          locationsDone.push(locationEntry);
+          const completionDate = new Date().toISOString().slice(0, 10);
+          const locationEntry = JSON.stringify({ id: monument.id, Route_name: monument.name, Date: completionDate });
 
-          // Update the user document with the new locationsDone array
-          await databases.updateDocument(databaseId, userCollectionId, userId, {
-            locationsDone: locationsDone,
-          });
+          if (!locationsDone.includes(locationEntry)) {
+            locationsDone.push(locationEntry);
+
+            await databases.updateDocument(databaseId, userCollectionId, userId, {
+              locationsDone: locationsDone,
+            });
+          }
+          
+          goto('/profile');
+        } catch (error) {
+          console.error('Error updating locationsDone:', error);
         }
-        
-        // Redirect to the profile page after a correct answer
-        goto('/profile');
-      } catch (error) {
-        console.error('Error updating locationsDone:', error);
       }
     }
   }
-}
-
 </script>
+
 
 <div class="pt-20">
   {#if stillLoading}

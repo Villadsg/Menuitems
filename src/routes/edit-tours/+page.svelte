@@ -147,27 +147,44 @@
       if (newPhotoFile) {
       // Delete the old photo if it exists
       if (editMonumentData.photoFileId) {
-        await storage.deleteFile('66efdb420000df196b64', editMonumentData.photoFileId);
+        try {
+          await storage.deleteFile('66efdb420000df196b64', editMonumentData.photoFileId);
+        } catch (error) {
+          console.error(`Error deleting old photo:`, error);
+        }
       }
 
       // Upload the compressed photo and update photoFileId
-      const uploadResponse = await storage.createFile('66efdb420000df196b64', ID.unique(), newPhotoFile);
-      editMonumentData.photoFileId = uploadResponse.$id;
+      try {
+        const uploadResponse = await storage.createFile('66efdb420000df196b64', ID.unique(), newPhotoFile);
+        editMonumentData.photoFileId = uploadResponse.$id;
+      } catch (error) {
+        console.error('Error uploading new photo:', error);
+        throw new Error('Failed to upload new photo');
+      }
 
       // Reset compressedFile after upload
       newPhotoFile = null;
     }
 
-
+    const updatedData = {
+      Route_name: editMonumentData.Route_name,
+      lat: editMonumentData.lat,
+      lng: editMonumentData.lng,
+      Description: editMonumentData.Description,
+      quiz_question_answer: editMonumentData.quiz_question_answer,
+      photoFileId: editMonumentData.photoFileId,
+      dateModified: currentDate
+    };
 
       // Update the original monument
-      await databases.updateDocument(databaseId, collectionId, id, updatedData);
+      await databases.updateDocument(databaseId, collectionId, editMonumentData.id, updatedData);
 
       // Fetch all translated copies
       const copies = await databases.listDocuments(
         databaseId,
         collectionId,
-        [Query.equal('idOriginal', id)]
+        [Query.equal('idOriginal', editMonumentData.id)]
       );
 
       // Delete existing translations
@@ -189,7 +206,7 @@
         const translatedAnswers = await Promise.all(updatedData.quiz_question_answer.map(answer => translateText(answer, code)));
 
         await databases.createDocument(databaseId, collectionId, ID.unique(), {
-          idOriginal: id,
+          idOriginal: editMonumentData.id,
           language: code,
           Route_name: editMonumentData.Route_name,
           lat: updatedData.lat,
@@ -210,8 +227,6 @@
         lng: '',
         Description: '',
         photoFileId: '',
-        startingPoint: ['', ''],
-        steps_in_route: [''],
         quiz_question_answer: ['']
       };
 
