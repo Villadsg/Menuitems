@@ -35,7 +35,7 @@
           <p class="mt-4">Create language learning routes and become a route designer</p>
           <a href="/selectlanguage">
             <button class="mt-8 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
-              Try a Route
+              Find a nearby photo
             </button>
           </a>
         </div>

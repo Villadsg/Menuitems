@@ -25,12 +25,11 @@
 
 
 
-
 <div class="bg-transparent navbar  fixed top-0 left-0 ">
   <div class="flex-1 text-center text-white" style="text-shadow: 1px 1px 2px black;">
     <a href="/" class="btn btn-ghost normal-case text-xl flex items-center">
       <img src="/logotime.png" class="h-12 w-12" alt="Logo" />
-      <span class="ml-2 font-semibold"> Langtour </span>
+      <span class="ml-2 font-semibold"> Picturality</span>
     </a>
   </div>
   <div class="flex-none">
