@@ -31,8 +31,8 @@
       <div class="flex items-start justify-center h-full bg-black bg-opacity-50 pt-60">
         <div class="text-center text-white p-4" style="text-shadow: 1px 1px 2px black;">
           <h1 class="text-4xl font-bold">Learn a language while exploring</h1>
-          <p class="mt-4"> Upgrade your experience as a tourist and get vouchers for local shops</p>
-          <p class="mt-4">Create language learning routes and become a route designer</p>
+          <p class="mt-4"> Upgrade your experience as a tourist</p>
+          <p class="mt-4">Connect your photos and create language learning routes </p>
           <a href="/selectlanguage">
             <button class="mt-8 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
               Find a nearby photo
