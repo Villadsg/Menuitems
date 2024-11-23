@@ -81,8 +81,8 @@
 
         const response = await storage.createFile(bucketId, ID.unique(), compressedFile, [
           Permission.read(Role.any()),
-          Permission.update(Role.user(userId)),
-          Permission.delete(Role.user(userId)),
+          Permission.update(Role.user(userId || "anonymous")),
+          Permission.delete(Role.user(userId || "anonymous")),
         ]);
         return response.$id;
       }
@@ -95,7 +95,7 @@
 
 
   let currentPage = 'beginSection';
-  $: userId = $user?.$id;
+  $: userId = $user?.$id || "anonymous";
 
   /** Function to translate text */
   async function translateText(text: string, targetLang: string) {
@@ -145,7 +145,7 @@
           correctAnswer,
           ...answers.filter(answer => answer.trim() !== "")
         ],
-        userId: userId,
+        userId: userId || "anonymous",
         photoFileId: mainPhotoFileId, // Main photo file ID
       };
 
