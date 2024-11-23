@@ -18,6 +18,7 @@
   let userNameChangable = "";
   let stillLoading = true;
   let isLoggedIn = false;
+let showModal = false;
 
   const databaseId = '6609473fbde756e5dc45';
   const collectionId = '66eefaaf001c2777deb9';
@@ -97,41 +98,51 @@
     hasSubmitted = false;
   }
 
-  async function submitQuiz() {
-    if (!isLoggedIn) {
-      alert("Please log in to submit your quiz.");
-      goto('/login'); // Redirect to the login page if not logged in
-      return;
-    }
+async function submitQuiz() {
+  if (!isLoggedIn) {
+    alert("Please log in to submit your quiz.");
+    goto('/login'); 
+    return;
+  }
 
-    if (selectedAnswer) {
-      hasSubmitted = true;
-      isCorrect = selectedAnswer === quizCorrectAnswer;
+  if (selectedAnswer) {
+    hasSubmitted = true;
+    isCorrect = selectedAnswer === quizCorrectAnswer;
 
-      if (isCorrect) {
-        try {
-          // Fetch user document to get the current locationsDone array
-          const userDoc = await databases.getDocument(databaseId, userCollectionId, userId);
-          let locationsDone = userDoc.locationsDone || [];
+    if (isCorrect) {
+      try {
+        const userDoc = await databases.getDocument(databaseId, userCollectionId, userId);
+        let locationsDone = userDoc.locationsDone || [];
 
-          const completionDate = new Date().toISOString().slice(0, 10);
-          const locationEntry = JSON.stringify({ id: monument.id, Route_name: monument.name, Date: completionDate });
+        const completionDate = new Date().toISOString().slice(0, 10);
+        const locationEntry = JSON.stringify({ id: monument.id, Route_name: monument.name, Date: completionDate });
 
-          if (!locationsDone.includes(locationEntry)) {
-            locationsDone.push(locationEntry);
+        if (!locationsDone.includes(locationEntry)) {
+          locationsDone.push(locationEntry);
 
-            await databases.updateDocument(databaseId, userCollectionId, userId, {
-              locationsDone: locationsDone,
-            });
-          }
-          
-          goto('/profile');
-        } catch (error) {
-          console.error('Error updating locationsDone:', error);
+          await databases.updateDocument(databaseId, userCollectionId, userId, {
+            locationsDone: locationsDone,
+          });
         }
+        
+        showModal = true;  // Show modal after successful submission
+      } catch (error) {
+        console.error('Error updating locationsDone:', error);
       }
     }
   }
+}
+  
+  
+  function goToHome() {
+  goto('/');
+}
+
+function startNewQuiz() {
+  goto('/find-quiz'); 
+}
+
+
 </script>
 
 
@@ -206,3 +217,16 @@
     </div>
   {/if}
 </div>
+
+
+
+{#if showModal}
+  <div class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
+    <div class="bg-white rounded-lg p-6 max-w-md mx-auto">
+      <h3 class="text-xl font-bold mb-4">Quiz Completed</h3>
+      <p class="mb-6">You completed the quiz! What would you like to do next?</p>
+      <button class="btn btn-primary mb-4 w-full" on:click={goToHome}>Go to Home Page</button>
+      <button class="btn btn-secondary w-full" on:click={startNewQuiz}>Start Another Quiz</button>
+    </div>
+  </div>
+{/if}
