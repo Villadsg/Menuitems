@@ -36,7 +36,7 @@
                     <div class="mt-6">
   <a href="/find-quiz">
     <button class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">
-      Find a hidden message nearby
+      Find locations
     </button>
   </a>
   </div>
