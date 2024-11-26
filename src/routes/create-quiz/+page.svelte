@@ -12,9 +12,6 @@
   let Description = '';
   let lat = '';
   let lng = '';
-  let question = "";
-  let answers: string[] = [];
-  let correctAnswer = "";
   let showCoordinatesInput = false; 
   let message = '';
   let languages = ['ES','IT','DA','JA']; 
@@ -93,8 +90,7 @@
       return null;
     }
   };
-
-
+  
   let currentPage = 'beginSection';
   $: userId = $user?.$id || "anonymous";
 
@@ -121,90 +117,74 @@
   }
 
   const submitQuiz = async () => {
-    try {
-      loading = true;
-      
-      // Upload main photo
-      const mainPhotoFileId = await uploadMainPhoto();
-      if (!mainPhotoFileId) {
-        message = 'Main photo upload failed. Please try again.';
-        return;
-      }
+  try {
+    loading = true;
 
-  
-
-      const documentData = {
-        dateModified: currentDate,
-        Route_name: routeName,
-        Description: Description,
-        closebyDescription: closebyDescription,
-        lat: parseFloat(lat),
-        lng: parseFloat(lng),
-        language: 'EN',
-        idOriginal: 'Main',
-        quiz_question_answer: [
-          question,
-          correctAnswer,
-          ...answers.filter(answer => answer.trim() !== "")
-        ],
-        userId: userId || "anonymous",
-        photoFileId: mainPhotoFileId, // Main photo file ID
-      };
-
-      const originalDocument = await AppwriteService.createDocument(collectionId, documentData);
-      const originalDocumentId = originalDocument.$id;
-
-      // Check if any languages were selected
-      if (languages.length > 0) {
-        // Loop through selected languages
-        for (const languageCode of languages) {
-          // Translate the inputs into the current language
-          const translatedDescription = await translateText(Description, languageCode);
-          // Create the translated startingPoint array with the translated description
-        
-
-          const translatedQuestion = await translateText(question, languageCode);
-          const translatedAnswers = await Promise.all(
-            answers.map(ans => translateText(ans, languageCode))
-          );
-          const translatedCorrectAnswer = await translateText(correctAnswer, languageCode);
-        const translatedClosebyDescription = await translateText(closebyDescription, languageCode);
-        
-          // Create the translated document data
-          const translatedDocumentData = {
-            ...documentData,
-            Route_name: routeName,
-            Description: translatedDescription,
-            closebyDescription: translatedClosebyDescription,
-            quiz_question_answer: [
-              translatedQuestion,
-              translatedCorrectAnswer,
-              ...translatedAnswers.filter(answer => answer.trim() !== "")
-            ],
-            language: languageCode,
-            idOriginal: originalDocumentId,
-            lat: parseFloat(lat),
-            lng: parseFloat(lng), 
-            userId: userId,
-            photoFileId: mainPhotoFileId, // Main photo file ID
-          };
-
-          // Save the translated document
-          await AppwriteService.createDocument(collectionId, translatedDocumentData);
-        }
-      }
-
-      currentPage = 'confirmationPage';
-      setTimeout(() => {
-        goto('/');
-      }, 4000);
-    } catch (error) {
-      message = `Failed to create monument and quiz. Error: ${error.message};`
-    } finally {
-      loading = false; // Hide spinner after loading is done
+    // Upload main photo
+    const mainPhotoFileId = await uploadMainPhoto();
+    if (!mainPhotoFileId) {
+      message = 'Main photo upload failed. Please try again.';
+      return;
     }
-  };
 
+    // Initialize translations object
+    const descriptionTranslations: Record<string, string> = {};
+    const closebyDescriptionTranslations: Record<string, string> = {};
+
+    // Loop through selected languages and populate translations
+    for (const languageCode of languages) {
+      try {
+        const translatedDescription = await translateText(Description, languageCode);
+        const translatedClosebyDescription = await translateText(closebyDescription, languageCode);
+
+        if (translatedDescription && translatedClosebyDescription) {
+          descriptionTranslations[languageCode] = translatedDescription;
+          closebyDescriptionTranslations[languageCode] = translatedClosebyDescription;
+        }
+      } catch (error) {
+        console.error(`Translation failed for ${languageCode}:`, error);
+      }
+    }
+
+    // Include the original English version in translations
+    descriptionTranslations['EN'] = Description;
+    closebyDescriptionTranslations['EN'] = closebyDescription;
+
+    // Serialize the translations as strings
+    const serializedDescription = JSON.stringify(descriptionTranslations);
+    const serializedClosebyDescription = JSON.stringify(closebyDescriptionTranslations);
+
+    // Prepare the document data
+    const documentData = {
+      dateModified: currentDate,
+      Route_name: routeName,
+      lat: parseFloat(lat),
+      lng: parseFloat(lng),
+      userId: userId || "anonymous",
+      photoFileId: mainPhotoFileId,
+      Description: serializedDescription, // Store serialized JSON as a string
+      closebyDescription: serializedClosebyDescription, // Store serialized JSON as a string
+    };
+
+    // Save the document with serialized translations
+    await AppwriteService.createDocument(collectionId, documentData, [
+      Permission.read(Role.any()),
+      Permission.update(Role.user(userId)),
+      Permission.delete(Role.user(userId)),
+    ]);
+
+    // Navigate to the confirmation page
+    currentPage = 'confirmationPage';
+    setTimeout(() => {
+      goto('/');
+    }, 4000);
+  } catch (error) {
+    console.error('SubmitQuiz error:', error);
+    message = `Failed to create monument and quiz. Error: ${error.message || 'Unknown error'}`;
+  } finally {
+    loading = false; // Hide spinner after loading is done
+  }
+};
   // Updated function to use getCurrentLocation from location.ts
   const fetchCurrentLocation = async () => {
     try {
@@ -230,7 +210,7 @@
       {#if currentPage === 'beginSection'}
         <!-- First Section (Monument Form) -->
         <h1 class="text-2xl font-bold mb-4">Create and describe a photo to find</h1>
-        <form on:submit|preventDefault={() => currentPage = 'questionSection'} class="space-y-4 max-w-md mx-auto">
+        <form on:submit|preventDefault={submitQuiz} class="space-y-4 max-w-md mx-auto">
           <div>
             <label for="routeName" class="label">Name of Place</label>
             <input id="routeName" type="text" bind:value={routeName} placeholder="'Best Bakery'" required class="input input-bordered w-full" />
@@ -295,7 +275,7 @@
         <!-- Confirmation Page -->
         <div transition:fly={{ x: 200, duration: 300 }} class="space-y-4 max-w-md mx-auto text-center">
           <h2 class="text-2xl font-bold">Success!</h2>
-          <p>Your monument and quiz were submitted successfully.</p>
+          <p>Your location was submitted successfully</p>
           <p>Redirecting you to the main page...</p>
         </div>
       {/if}
