@@ -16,32 +16,15 @@ let showTooFarMessage = false;
   let page = 'home';
   const databaseId = '6609473fbde756e5dc45';  
   const collectionId = '66eefaaf001c2777deb9';  
-
+const userCollectionId = '66fbb317002371bfdffc'; 
   const bucketId = '66efdb420000df196b64';
-  const userCollectionId = '66fbb317002371bfdffc'; 
-  let language = 'english'; 
+  let language = 'EN'; 
   let latitude: number | null = null;
   let longitude: number | null = null;
   let monuments = [];
   let sortedMonuments = [];
 
-  // User-related code
-  let userStatus = writable<Promise<null | object>>(null);
 
-  const checkUser = async () => {
-    try {
-      const currentUser = await account.get();
-      if (currentUser && currentUser.$id) {
-        // Fetch the user's langLearn attribute
-        const userDoc = await databases.getDocument(databaseId, userCollectionId, currentUser.$id);
-        language = userDoc.langLearn || 'english'; // Set language based on user's selection
-        return currentUser;
-      }
-      return null;
-    } catch (error) {
-      return null;
-    }
-  };
 
 const loadMonuments = async () => {
   const response = await databases.listDocuments(databaseId, collectionId, [
@@ -57,7 +40,7 @@ const loadMonuments = async () => {
         photoUrl = storage.getFilePreview(bucketId, doc.photoFileId).href;
       }
 
-      if (doc.userId) {
+    if (doc.userId) {
         try {
           const userDoc = await databases.getDocument(databaseId, userCollectionId, doc.userId);
           creator = userDoc.userNameChangable || 'Unknown';
@@ -114,8 +97,6 @@ const selectMonument = (monument) => {
   };
 
   onMount(async () => {
-    const user = await checkUser();
-    userStatus.set(Promise.resolve(user));
     await loadMonuments();
     await findLocation();
   });
@@ -138,6 +119,7 @@ const closeTooFarMessage = () => {
 };
 
 </script>
+
 <div class="space-y-4 max-w-md mx-auto pt-20">
   {#if showDistanceCheck}
     <DistanceCheck
@@ -146,80 +128,65 @@ const closeTooFarMessage = () => {
       onCancel={cancelNavigation}
     />
   {/if}
-  
+
   {#if showTooFarMessage}
-  <DistanceCheck
-    monumentTooFar={true}
-    onCloseTooFar={closeTooFarMessage}
-  />
+    <DistanceCheck
+      monumentTooFar={true}
+      onCloseTooFar={closeTooFarMessage}
+    />
   {/if}
 
-  {#await $userStatus}
-    <!-- Loading state while fetching user status -->
+  <!-- Only show monument content if on a relevant page -->
+  {#if page === 'results'}
+    <!-- Main content container -->
+    <div class="max-w-4xl mx-auto p-6 bg-base-100 rounded-lg shadow-lg mt-10">
+      {#if sortedMonuments.length > 0}
+        <h1 class="text-2xl font-bold mb-6 text-center">List of places Nearby</h1>
+        {#each sortedMonuments as monument}
+          <div class="mb-6 p-5 bg-base-200 rounded-lg shadow">
+            <h3 class="text-xl font-semibold text-base-content mb-2">{monument.name}</h3>
+            <p class="text-gray-500 mb-3">{monument.description}</p> <!-- Display Description -->
+
+            {#if monument.photoUrl}
+              <img
+                src="{monument.photoUrl}"
+                alt="{monument.name}"
+                class="my-3 max-w-xs rounded shadow mx-auto"
+              />
+            {/if}
+
+            <p class="text-gray-500">
+              Distance to location: <span class="font-semibold">{monument.distance.toFixed(2)} km</span>
+            </p>
+            <p class="text-gray-500">
+              Date Modified: <span class="font-semibold">{monument.dateModified}</span>
+            </p>
+            <p class="text-gray-500">
+              Creator: <span class="font-semibold">{monument.creator}</span>
+            </p>
+
+            <button
+              class="btn btn-success w-full mt-3"
+              on:click={() => selectMonument(monument)}
+            >
+              Open
+            </button>
+          </div>
+        {/each}
+      {:else}
+        <p class="text-center text-gray-500">No monuments found.</p>
+      {/if}
+
+      <button
+        class="btn btn-outline w-full mt-6"
+        on:click={navigateTohome}
+      >
+        Back to Home
+      </button>
+    </div>
+  {:else}
     <div class="flex items-center justify-center min-h-screen">
       <span class="loading loading-spinner loading-lg"></span>
     </div>
-  {:then user}
-    {#if user}
-      <!-- Only show monument content if on a relevant page -->
-      {#if page !== 'results'}
-        <div class="flex items-center justify-center min-h-screen">
-          <span class="loading loading-spinner loading-lg"></span>
-        </div>
-      {/if}
-
-      <!-- Main content container -->
-      <div class="max-w-4xl mx-auto p-6 bg-base-100 rounded-lg shadow-lg mt-10">
-        
-        {#if sortedMonuments.length > 0}
-          <h1 class="text-2xl font-bold mb-6 text-center">List of Challenges Nearby</h1>
-          {#each sortedMonuments as monument}
-  <div class="mb-6 p-5 bg-base-200 rounded-lg shadow">
-    <h3 class="text-xl font-semibold text-base-content mb-2">{monument.name}</h3>
-    <p class="text-gray-500 mb-3">{monument.description}</p> <!-- Display Description -->
-
-    {#if monument.photoUrl}
-      <img
-        src="{monument.photoUrl}"
-        alt="{monument.name}"
-        class="my-3 max-w-xs rounded shadow mx-auto"
-      />
-    {/if}
-
-    <p class="text-gray-500">
-      Distance to location: <span class="font-semibold">{monument.distance.toFixed(2)} km</span>
-    </p>
-    <p class="text-gray-500">
-      Date Modified: <span class="font-semibold">{monument.dateModified}</span>
-    </p>
-    <p class="text-gray-500">
-      Creator: <span class="font-semibold">{monument.creator}</span>
-    </p>
-
-    <button
-      class="btn btn-success w-full mt-3"
-      on:click={() => selectMonument(monument)}
-    >
-      Open
-    </button>
-  </div>
-{/each}
-        {:else}
-          <p class="text-center text-gray-500">No monuments found.</p>
-        {/if}
-        
-        <button
-          class="btn btn-outline w-full mt-6"
-          on:click={navigateTohome}
-        >
-          Back to Home
-        </button>
-      </div>
-    {/if}
-    
-  {:catch error}
-    <div class="flex items-center justify-center min-h-screen text-error">
-      Error loading user status: {error.message}
-    </div>
-  {/await}
+  {/if}
 </div>

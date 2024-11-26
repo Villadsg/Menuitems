@@ -4,14 +4,9 @@
   import { page } from '$app/stores';
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
-
+let closebyDescription = "";
   let monument: string;
-  let quizQuestion = "";
-  let quizCorrectAnswer = "";
-  let quizAnswers: string[] = [];
   let dateMod = Date();
-  let selectedAnswer = "";
-  let hasSubmitted = false;
   let isCorrect = false;
   let quizDescription = "";
   let currentPage = 0;
@@ -69,10 +64,7 @@ let showModal = false;
 
         quizDescription = doc.Description;
         dateMod = doc.dateModified.slice(0, 16).replace('T', ' ');
-        quizQuestion = doc.quiz_question_answer[0];
-        quizAnswers = doc.quiz_question_answer.slice(2);
-        quizCorrectAnswer = doc.quiz_question_answer[1];
-
+        closebyDescription = doc.closebyDescription;
       } catch (error) {
         console.error('Error loading monument or user data:', error);
         monument = null;
@@ -93,10 +85,6 @@ let showModal = false;
     }
   }
 
-  function selectAnswer(answer: string) {
-    selectedAnswer = answer;
-    hasSubmitted = false;
-  }
 
 async function submitQuiz() {
   if (!isLoggedIn) {
@@ -105,11 +93,6 @@ async function submitQuiz() {
     return;
   }
 
-  if (selectedAnswer) {
-    hasSubmitted = true;
-    isCorrect = selectedAnswer === quizCorrectAnswer;
-
-    if (isCorrect) {
       try {
         const userDoc = await databases.getDocument(databaseId, userCollectionId, userId);
         let locationsDone = userDoc.locationsDone || [];
@@ -129,8 +112,6 @@ async function submitQuiz() {
       } catch (error) {
         console.error('Error updating locationsDone:', error);
       }
-    }
-  }
 }
   
   
@@ -170,33 +151,16 @@ function startNewQuiz() {
           </div>
         {/if}
 
-        {#if currentPage === 1}
-          <div in:fly={{ y: 100, duration: 500 }} out:fly={{ y: -100, duration: 500 }}>
-            <h2 class="text-xl font-bold">Quiz</h2>
-            {#if quizQuestion}
-              <p class="mt-4 text-lg">{quizQuestion}</p>
-              <ul class="mt-4 space-y-2">
-                {#each quizAnswers as answer}
-                  <button 
-                    class="btn w-full text-left p-2 {selectedAnswer === answer ? 'btn-primary' : 'btn-ghost'}"
-                    on:click={() => selectAnswer(answer)}
-                    type="button"
-                  >
-                    {answer}
-                  </button>
-                {/each}
-              </ul>
+      {#if currentPage === 1}
+  <div in:fly={{ y: 100, duration: 500 }} out:fly={{ y: -100, duration: 500 }} class="flex justify-center">
+    <div class="card w-full max-w-lg bg-base-100 shadow-xl">
+      <div class="card-body">
+        <p class="text-lg font-medium text-gray-800">{closebyDescription}</p>
+      </div>
+    </div>
+  </div>
+{/if}
 
-              {#if hasSubmitted}
-                <div class="alert mt-4 {isCorrect ? 'alert-success' : 'alert-error'}">
-                  <span>{isCorrect ? 'Correct answer!' : 'Wrong answer. Try again!'}</span>
-                </div>
-              {/if}
-            {:else}
-              <p class="text-error mt-4">No quiz available for this monument.</p>
-            {/if}
-          </div>
-        {/if}
       {/key}
 
       <div>
@@ -204,10 +168,10 @@ function startNewQuiz() {
           <button class="btn btn-secondary mb-4" on:click={prevPage}>Back</button>
         {/if}
         {#if currentPage < 1}
-          <button class="btn btn-secondary mt-4" on:click={nextPage}>Next</button>
+          <button class="btn btn-secondary mt-4" on:click={nextPage}>Go to hidden text</button>
         {/if}
-        {#if !hasSubmitted && currentPage === 1 && selectedAnswer}
-          <button class="btn btn-primary mt-4" on:click={submitQuiz}>Submit</button>
+        {#if currentPage === 1}
+          <button class="btn btn-primary mt-4" on:click={submitQuiz}>Done</button>
         {/if}
       </div>
     </div>
@@ -223,10 +187,10 @@ function startNewQuiz() {
 {#if showModal}
   <div class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
     <div class="bg-white rounded-lg p-6 max-w-md mx-auto">
-      <h3 class="text-xl font-bold mb-4">Quiz Completed</h3>
-      <p class="mb-6">You completed the quiz! What would you like to do next?</p>
+      <h3 class="text-xl font-bold mb-4">Place discovered!</h3>
+      <p class="mb-6">You discovered ..! What would you like to do next?</p>
       <button class="btn btn-primary mb-4 w-full" on:click={goToHome}>Go to Home Page</button>
-      <button class="btn btn-secondary w-full" on:click={startNewQuiz}>Start Another Quiz</button>
+      <button class="btn btn-secondary w-full" on:click={startNewQuiz}>Discover</button>
     </div>
   </div>
 {/if}
