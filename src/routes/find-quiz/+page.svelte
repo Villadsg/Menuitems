@@ -1,3 +1,5 @@
+
+
 <script lang="ts">
   import { getCurrentLocation, calculateDistance } from '$lib/location'; // Import location utilities
   import { account, databases, storage } from '$lib/appwrite'; // Import the initialized Appwrite client
@@ -8,7 +10,7 @@
   import DistanceCheck from '$lib/distanceCheck.svelte'; 
   let showDistanceCheck = false; 
   let selectedMonument = null; 
-
+let showTooFarMessage = false;
   // State variables
   let status = '';
   let page = 'home';
@@ -41,12 +43,13 @@
     }
   };
 
-  const loadMonuments = async () => {
-    const response = await databases.listDocuments(databaseId, collectionId,
-    [Query.equal('language', language)]
-    );
+const loadMonuments = async () => {
+  const response = await databases.listDocuments(databaseId, collectionId, [
+    Query.equal('language', language),
+  ]);
 
-    monuments = await Promise.all(response.documents.map(async (doc) => {
+  monuments = await Promise.all(
+    response.documents.map(async (doc) => {
       let photoUrl = null;
       let creator = 'unknown';
 
@@ -66,14 +69,16 @@
       return {
         id: doc.$id,
         name: doc.Route_name,
+        description: doc.Description, // Include the Description attribute
         lat: parseFloat(doc.lat),
         lng: parseFloat(doc.lng),
         photoUrl,
-        dateModified: doc.dateModified.slice(0, 16).replace('T', ' '), 
-        creator
+        dateModified: doc.dateModified.slice(0, 16).replace('T', ' '),
+        creator,
       };
-    }));
-  };
+    })
+  );
+};
 
   const findLocation = async () => {
     try {
@@ -94,9 +99,12 @@
       status = error.message;
     }
   };
-
-  const selectMonument = (monument) => {
-    if (monument.distance > 1) {
+  
+  
+const selectMonument = (monument) => {
+    if (monument.distance > 1000) {
+      showTooFarMessage = true; // Show the "too far" message
+    } else if (monument.distance > 1) {
       selectedMonument = monument; // Store the selected monument
       showDistanceCheck = true; // Show the DistanceCheck component if the distance is greater than 1 km
     } else {
@@ -125,6 +133,10 @@
     showDistanceCheck = false; // Hide the DistanceCheck component and stay on the current page
   };
 
+const closeTooFarMessage = () => {
+    showTooFarMessage = false;
+};
+
 </script>
 <div class="space-y-4 max-w-md mx-auto pt-20">
   {#if showDistanceCheck}
@@ -133,6 +145,13 @@
       onContinue={continueNavigation}
       onCancel={cancelNavigation}
     />
+  {/if}
+  
+  {#if showTooFarMessage}
+  <DistanceCheck
+    monumentTooFar={true}
+    onCloseTooFar={closeTooFarMessage}
+  />
   {/if}
 
   {#await $userStatus}
@@ -155,35 +174,36 @@
         {#if sortedMonuments.length > 0}
           <h1 class="text-2xl font-bold mb-6 text-center">List of Challenges Nearby</h1>
           {#each sortedMonuments as monument}
-            <div class="mb-6 p-5 bg-base-200 rounded-lg shadow">
-              <h3 class="text-xl font-semibold text-base-content mb-2">{monument.name}</h3>
-              
-              {#if monument.photoUrl}
-                <img
-                  src="{monument.photoUrl}"
-                  alt="{monument.name}"
-                  class="my-3 max-w-xs rounded shadow mx-auto"
-                />
-              {/if}
-              
-              <p class="text-gray-500">
-                Distance to starting point: <span class="font-semibold">{monument.distance.toFixed(2)} km</span>
-              </p>
-              <p class="text-gray-500">
-                Date Modified: <span class="font-semibold">{monument.dateModified}</span>
-              </p>
-              <p class="text-gray-500">
-                Creator: <span class="font-semibold">{monument.creator}</span>
-              </p>
-              
-              <button
-                class="btn btn-success w-full mt-3"
-                on:click={() => selectMonument(monument)}
-              >
-                Select
-              </button>
-            </div>
-          {/each}
+  <div class="mb-6 p-5 bg-base-200 rounded-lg shadow">
+    <h3 class="text-xl font-semibold text-base-content mb-2">{monument.name}</h3>
+    <p class="text-gray-500 mb-3">{monument.description}</p> <!-- Display Description -->
+
+    {#if monument.photoUrl}
+      <img
+        src="{monument.photoUrl}"
+        alt="{monument.name}"
+        class="my-3 max-w-xs rounded shadow mx-auto"
+      />
+    {/if}
+
+    <p class="text-gray-500">
+      Distance to location: <span class="font-semibold">{monument.distance.toFixed(2)} km</span>
+    </p>
+    <p class="text-gray-500">
+      Date Modified: <span class="font-semibold">{monument.dateModified}</span>
+    </p>
+    <p class="text-gray-500">
+      Creator: <span class="font-semibold">{monument.creator}</span>
+    </p>
+
+    <button
+      class="btn btn-success w-full mt-3"
+      on:click={() => selectMonument(monument)}
+    >
+      Open
+    </button>
+  </div>
+{/each}
         {:else}
           <p class="text-center text-gray-500">No monuments found.</p>
         {/if}

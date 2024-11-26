@@ -17,7 +17,8 @@
   let correctAnswer = "";
   let showCoordinatesInput = false; 
   let message = '';
-  let languages = ['ES','IT','DA','JA']; // Array to hold selected languages
+  let languages = ['ES','IT','DA','JA']; 
+  let closebyDescription = '';
   const currentDate = new Date().toISOString().slice(0, 16).replace('T', ' ');
 
   let filesMainPhoto: FileList | null = null;
@@ -136,6 +137,7 @@
         dateModified: currentDate,
         Route_name: routeName,
         Description: Description,
+        closebyDescription: closebyDescription,
         lat: parseFloat(lat),
         lng: parseFloat(lng),
         language: 'EN',
@@ -166,12 +168,14 @@
             answers.map(ans => translateText(ans, languageCode))
           );
           const translatedCorrectAnswer = await translateText(correctAnswer, languageCode);
-
+        const translatedClosebyDescription = await translateText(closebyDescription, languageCode);
+        
           // Create the translated document data
           const translatedDocumentData = {
             ...documentData,
             Route_name: routeName,
             Description: translatedDescription,
+            closebyDescription: translatedClosebyDescription,
             quiz_question_answer: [
               translatedQuestion,
               translatedCorrectAnswer,
@@ -267,64 +271,26 @@
           {/if}
           
           <div>
-            <label for="Description" class="label">Photo Description</label>
-            <textarea id="Description" bind:value={Description} placeholder="'When I was here this happened'" required class="textarea textarea-bordered w-full h-24"></textarea>
+            <label for="Description" class="label">Photo introduction</label>
+            <textarea id="Description" bind:value={Description} placeholder="'A house build with wood'" required class="textarea textarea-bordered w-full h-24"></textarea>
+            
+            <label for="closebyDescription" class="label">Description only available close by</label>
+            <textarea id="closebyDescription" bind:value={closebyDescription} placeholder="'If you knock three times ill come out with chocolate'" required class="textarea textarea-bordered w-full h-24"></textarea>
+            
+            
+            
           </div>
-         
-          <button type="submit"  class="btn btn-success w-full mt-3">Next: add quiz question</button>
+          
+          
+         <button type="button" class="btn btn-success w-full mt-3" on:click={submitQuiz}>
+  {#if loading}
+  <span class="loading loading-spinner"></span> Submitting...
+{:else}
+  Submit
+{/if}
+</button>
         </form>
 
-      {:else if currentPage === 'questionSection'}
-        <!-- Quiz Question Form -->
-        <h2 class="text-xl font-bold">Add Quiz Question</h2>
-        <div>
-          <label for="question" class="label">Quiz Question</label>
-          <input id="question" type="text" bind:value={question} placeholder="Enter quiz question" class="input input-bordered w-full" required />
-        </div>
-        <h3 class="text-lg font-bold">Add answer options in the multiple choice:</h3>
-        {#each answers as answer, index}
-          <div class="flex items-center space-x-2">
-            <!-- Answer input -->
-            <input 
-              type="text" 
-              bind:value={answers[index]} 
-              class="input input-bordered w-full" 
-              placeholder="Enter answer option"
-            />
-            
-            <!-- Radio button for marking the correct answer -->
-            <input 
-              type="radio" 
-              name="correctAnswer" 
-              value={answers[index]} 
-              checked={correctAnswer === answers[index]} 
-              on:change={() => correctAnswer = answers[index]}
-            />
-            
-            <button 
-              type="button" 
-              class="btn btn-outline btn-error" 
-              on:click={() => answers = answers.filter((_, i) => i !== index)}
-            >
-              Remove
-            </button>
-          </div>
-        {/each}
-        <button 
-          type="button" 
-          class="btn btn-outline mt-2" 
-          on:click={() => answers = [...answers, '']}
-        >
-          Add Option
-        </button>
-        
-        <button type="button" class="btn btn-success w-full" on:click={submitQuiz}>
-          {#if loading}
-          <span class="loading loading-spinner mr-2"></span> Submitting...
-        {:else}
-          Submit Quiz
-        {/if}
-        </button>
       {:else if currentPage === 'confirmationPage'}
         <!-- Confirmation Page -->
         <div transition:fly={{ x: 200, duration: 300 }} class="space-y-4 max-w-md mx-auto text-center">
