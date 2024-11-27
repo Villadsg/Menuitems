@@ -27,9 +27,7 @@ const userCollectionId = '66fbb317002371bfdffc';
 
 
 const loadMonuments = async () => {
-  const response = await databases.listDocuments(databaseId, collectionId, [
-    Query.equal('language', language),
-  ]);
+  const response = await databases.listDocuments(databaseId, collectionId);
 
   monuments = await Promise.all(
     response.documents.map(async (doc) => {

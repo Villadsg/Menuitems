@@ -73,7 +73,7 @@
       const response = await databases.listDocuments(
         databaseId,
         collectionId,
-        [Query.equal('userId', userId),Query.equal('language', 'EN')]
+        [Query.equal('userId', userId)]
       );
       monuments = response.documents;
       message = monuments.length === 0 ? 'No monument tours created yet.' : '';
