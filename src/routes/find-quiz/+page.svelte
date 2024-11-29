@@ -38,7 +38,7 @@ const loadMonuments = async () => {
         photoUrl = storage.getFilePreview(bucketId, doc.photoFileId).href;
       }
 
-    if (doc.userId) {
+      if (doc.userId) {
         try {
           const userDoc = await databases.getDocument(databaseId, userCollectionId, doc.userId);
           creator = userDoc.userNameChangable || 'Unknown';
@@ -47,10 +47,19 @@ const loadMonuments = async () => {
         }
       }
 
+      // Parse the Description JSON and extract the English ('EN') description
+      let englishDescription = "No description available";
+      try {
+        const descriptionJson = JSON.parse(doc.Description);
+        englishDescription = descriptionJson['EN'] || "No description available";
+      } catch (error) {
+        console.error("Error parsing Description JSON:", error);
+      }
+
       return {
         id: doc.$id,
         name: doc.Route_name,
-        description: doc.Description, // Include the Description attribute
+        description: englishDescription, // Use the English description
         lat: parseFloat(doc.lat),
         lng: parseFloat(doc.lng),
         photoUrl,

@@ -26,8 +26,7 @@
     lat: '',
     lng: '',
     photoFileId: '',
-    Description: '',
-    quiz_question_answer: ['']
+    Description: ''
   };
 
   let newPhotoFile = null;
@@ -127,25 +126,25 @@
   };
 
   const editMonument = (monument) => {
-    isEditing = true;
-    editMonumentData = {
-      id: monument.$id,
-      Route_name: monument.Route_name,
-      lat: monument.lat,
-      lng: monument.lng,
-      photoFileId: monument.photoFileId,
-      Description: monument.Description || '',
-      quiz_question_answer: monument.quiz_question_answer || []
-    };
+  isEditing = true;
+  editMonumentData = {
+    id: monument.$id,
+    Route_name: monument.Route_name,
+    lat: monument.lat,
+    lng: monument.lng,
+    photoFileId: monument.photoFileId,
+    Description: JSON.parse(monument.Description)?.['EN'] || '', // Load English translation
+    closebyDescription: JSON.parse(monument.closebyDescription)?.['EN'] || '', // Load English 
   };
+};
 
   const updateMonument = async () => {
-    try {
-      loading = true;
-      const currentDate = new Date().toISOString();
+  try {
+    loading = true;
+    const currentDate = new Date().toISOString();
 
-      if (newPhotoFile) {
-      // Delete the old photo if it exists
+    // Handle new photo upload if applicable
+    if (newPhotoFile) {
       if (editMonumentData.photoFileId) {
         try {
           await storage.deleteFile('66efdb420000df196b64', editMonumentData.photoFileId);
@@ -154,7 +153,6 @@
         }
       }
 
-      // Upload the compressed photo and update photoFileId
       try {
         const uploadResponse = await storage.createFile('66efdb420000df196b64', ID.unique(), newPhotoFile);
         editMonumentData.photoFileId = uploadResponse.$id;
@@ -163,81 +161,66 @@
         throw new Error('Failed to upload new photo');
       }
 
-      // Reset compressedFile after upload
       newPhotoFile = null;
     }
 
+    // Parse the existing JSON for Description and closebyDescription
+    let descriptionTranslations = {};
+    let closebyDescriptionTranslations = {};
+
+    try {
+      descriptionTranslations = JSON.parse(editMonumentData.Description);
+      closebyDescriptionTranslations = JSON.parse(editMonumentData.closebyDescription);
+    } catch (error) {
+      console.error('Error parsing JSON fields:', error);
+    }
+
+    // Language codes for translations
+    const targetLangs = ['IT', 'ES', 'JA', 'DA'];
+
+    // Update the English ('EN') translations
+    descriptionTranslations['EN'] = editMonumentData.Description;
+    closebyDescriptionTranslations['EN'] = editMonumentData.closebyDescription;
+
+    // Translate the new English text into other languages
+    for (const lang of targetLangs) {
+      descriptionTranslations[lang] = await translateText(editMonumentData.Description, lang);
+      closebyDescriptionTranslations[lang] = await translateText(editMonumentData.closebyDescription, lang);
+    }
+
+    // Prepare the updated data
     const updatedData = {
       Route_name: editMonumentData.Route_name,
       lat: editMonumentData.lat,
       lng: editMonumentData.lng,
-      Description: editMonumentData.Description,
-      quiz_question_answer: editMonumentData.quiz_question_answer,
+      Description: JSON.stringify(descriptionTranslations), // Save updated translations as JSON string
+      closebyDescription: JSON.stringify(closebyDescriptionTranslations), // Save updated translations as JSON string
       photoFileId: editMonumentData.photoFileId,
-      dateModified: currentDate
+      dateModified: currentDate,
     };
 
-      // Update the original monument
-      await databases.updateDocument(databaseId, collectionId, editMonumentData.id, updatedData);
+    // Update the original document
+    await databases.updateDocument(databaseId, collectionId, editMonumentData.id, updatedData);
 
-      // Fetch all translated copies
-      const copies = await databases.listDocuments(
-        databaseId,
-        collectionId,
-        [Query.equal('idOriginal', editMonumentData.id)]
-      );
+    isEditing = false;
+    editMonumentData = {
+      id: '',
+      Route_name: '',
+      lat: '',
+      lng: '',
+      Description: '',
+      closebyDescription: '',
+      photoFileId: '',
+    };
 
-      // Delete existing translations
-      for (const copy of copies.documents) {
-        await databases.deleteDocument(databaseId, collectionId, copy.$id);
-      }
-
-      // Language codes for translations
-      const targetLangs = {
-        'Italian': 'IT',
-        'Spanish': 'ES',
-        'Japanese': 'JA',
-        'Danish': 'DA'
-      };
-
-      // Translate and create new documents for each language
-      for (const [language, code] of Object.entries(targetLangs)) {
-        const translatedDescription = await translateText(updatedData.Description, code);
-        const translatedAnswers = await Promise.all(updatedData.quiz_question_answer.map(answer => translateText(answer, code)));
-
-        await databases.createDocument(databaseId, collectionId, ID.unique(), {
-          idOriginal: editMonumentData.id,
-          language: code,
-          Route_name: editMonumentData.Route_name,
-          lat: updatedData.lat,
-          lng: updatedData.lng,
-          userId,
-          photoFileId: editMonumentData.photoFileId,
-          Description: translatedDescription,
-          quiz_question_answer: translatedAnswers,
-          dateModified: currentDate
-        });
-      }
-
-      isEditing = false;
-      editMonumentData = {
-        id: '',
-        Route_name: '',
-        lat: '',
-        lng: '',
-        Description: '',
-        photoFileId: '',
-        quiz_question_answer: ['']
-      };
-
-      await loadMonuments();
-    } catch (error) {
-      console.error('Error updating monument:', error);
-      message = 'Failed to update monument.';
-    } finally {
-      loading = false;
-    }
-  };
+    await loadMonuments();
+  } catch (error) {
+    console.error('Error updating monument:', error);
+    message = 'Failed to update monument.';
+  } finally {
+    loading = false;
+  }
+};
 
   const cancelEdit = () => {
     isEditing = false;
@@ -249,8 +232,7 @@
       Description: '',
       photoFileId: '',
       startingPoint: ['', ''],
-      steps_in_route: [''],
-      quiz_question_answer: ['']
+      steps_in_route: ['']
     };
   };
 
@@ -259,18 +241,7 @@
   });
 
 
-  const modifyAnswers = (action, index) => {
-    if (action === 'add') {
-      editMonumentData.quiz_question_answer = [...editMonumentData.quiz_question_answer, ''];
-    } else if (action === 'remove' && index !== null) {
-      editMonumentData.quiz_question_answer = editMonumentData.quiz_question_answer.filter((_, i) => i !== index);
-    }
-  };
 
-    // Function to set a potential answer as correct by updating index 1
-    function setCorrectAnswer(index: number) {
-    editMonumentData.quiz_question_answer[1] = editMonumentData.quiz_question_answer[index];
-  }
 </script>
 
 <!-- Edit Monument Form -->
@@ -320,27 +291,16 @@
             <span class="label-text">Description</span>
             <textarea bind:value={editMonumentData.Description} class="textarea textarea-bordered" required></textarea>
           </div>
-
-
-
+          
           <div class="form-control">
-            <span class="label-text">Quiz Question and Answers</span>
-          
-            <!-- Display the Question -->
-            <div class="flex items-center space-x-2">
-              <input type="text" bind:value={editMonumentData.quiz_question_answer[0]} class="input input-bordered w-full" placeholder="Enter question" />
-              <span class="text-gray-500">Question</span>
-            </div>
-          
-            <!-- Display Potential Answers -->
-            {#each editMonumentData.quiz_question_answer.slice(2) as answer, index}
-              <div class="flex items-center space-x-2 mt-2">
-                <input type="text" bind:value={editMonumentData.quiz_question_answer[index + 2]} class="input input-bordered w-full" placeholder="Enter answer option" />
-                <button type="button" class="btn btn-outline" on:click={() => setCorrectAnswer(index + 2)}>Set as Correct</button>
-              </div>
-            {/each}
-            <button type="button" class="btn btn-outline mt-2" on:click={() => modifyAnswers('add', null)}>Add Answer</button>
-          </div>
+  <span class="label-text">Closeby Description</span>
+  <textarea
+    bind:value={editMonumentData.closebyDescription}
+    class="textarea textarea-bordered"
+    required
+  ></textarea>
+</div>
+
 
           <div class="card-actions justify-end mt-4">
             <button type="submit" class="btn btn-primary">
