@@ -26,7 +26,8 @@
     lat: '',
     lng: '',
     photoFileId: '',
-    Description: ''
+    Description: '',
+    closebyDescription: ''
   };
 
   let newPhotoFile = null;
@@ -88,16 +89,6 @@
     try {
       if (monument.photoFileId) {
         await storage.deleteFile('66efdb420000df196b64', monument.photoFileId);
-      }
-
-      const copies = await databases.listDocuments(
-        databaseId,
-        collectionId,
-        [Query.equal('idOriginal', monument.$id)]
-      );
-
-      for (const copy of copies.documents) {
-        await databases.deleteDocument(databaseId, collectionId, copy.$id);
       }
 
       await databases.deleteDocument(databaseId, collectionId, monument.$id);
@@ -324,7 +315,7 @@
         <li class="card bg-base-100 shadow-lg">
           <div class="card-body">
             <h3 class="card-title">{monument.Route_name}</h3>
-            <p><strong>Description:</strong> {monument.Description}</p>
+            <p><strong>Description:</strong>  {JSON.parse(monument.Description)?.EN || 'No English description available'}</p>
             <p>Date Modified: {monument.dateModified.slice(0, 16).replace('T', ' ')}</p>
             <div class="card-actions justify-end">
               <button class="btn btn-outline btn-error" on:click={() =>  initiateDelete(monument)}>Delete</button>
