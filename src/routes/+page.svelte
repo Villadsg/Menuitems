@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { account } from '$lib/appwrite';
   import { onMount } from 'svelte';
   import { writable } from 'svelte/store';
   import { checkUser, user } from '$lib/userStore'; // Import from auth.ts
@@ -23,6 +22,7 @@
   {#if user}
     <!-- Show MonumentFinder component when logged in -->
     <div class="pt-20">
+      <!-- Put map here-->
       <p>Here is some interesting info and news. For example a map of all the nearby photos </p>
     </div>
   {:else}
@@ -65,3 +65,4 @@
   <!-- No need to treat it as a critical error -->
   <div>Error loading user status: {error.message}</div>
 {/await}
+
