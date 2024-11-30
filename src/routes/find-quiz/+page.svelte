@@ -158,7 +158,7 @@ const closeTooFarMessage = () => {
               <img
                 src="{monument.photoUrl}"
                 alt="{monument.name}"
-                
+                class="max-w-xs rounded shadow mx-auto"
               />
             {/if}
 
