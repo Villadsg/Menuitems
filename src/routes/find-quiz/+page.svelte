@@ -4,7 +4,9 @@
   import { getCurrentLocation, calculateDistance } from '$lib/location'; // Import location utilities
   import { account, databases, storage } from '$lib/appwrite'; // Import the initialized Appwrite client
   import { onMount } from 'svelte';
-  import { goto } from '$app/navigation'; // Import the goto function from SvelteKit
+  import { goto } from '$app/navigation';
+  import Map from '$lib/Map.svelte';
+  // Import the goto function from SvelteKit
   import DistanceCheck from '$lib/distanceCheck.svelte'; 
   let showDistanceCheck = false; 
   let selectedMonument = null; 
@@ -145,6 +147,8 @@ const closeTooFarMessage = () => {
   {#if page === 'results'}
     <!-- Main content container -->
     <div class="max-w-4xl mx-auto p-6 bg-base-100 rounded-lg shadow-lg mt-10">
+      <h1 class="text-2xl font-bold mb-6 text-center">Map of places</h1>
+      <Map monuments={monuments} />
       {#if sortedMonuments.length > 0}
         <h1 class="text-2xl font-bold mb-6 text-center">List of places Nearby</h1>
         {#each sortedMonuments as monument}
