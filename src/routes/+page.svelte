@@ -30,8 +30,8 @@
   {#if user}
     <!-- Show Map component when logged in -->
     <div class="pt-20">
+      <h1>Map of nearby hidden locations</h1>
       <Map/>
-      <p class="mt-4">Here is some interesting info and news. For example a map of all the nearby photos </p>
     </div>
   {:else}
     <!-- Background image section using Tailwind CSS for not logged-in users -->

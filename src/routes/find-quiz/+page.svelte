@@ -4,9 +4,7 @@
   import { getCurrentLocation, calculateDistance } from '$lib/location'; // Import location utilities
   import { account, databases, storage } from '$lib/appwrite'; // Import the initialized Appwrite client
   import { onMount } from 'svelte';
-  import { writable } from 'svelte/store';
   import { goto } from '$app/navigation'; // Import the goto function from SvelteKit
-  import { Query } from 'appwrite';
   import DistanceCheck from '$lib/distanceCheck.svelte'; 
   let showDistanceCheck = false; 
   let selectedMonument = null; 
