@@ -4,8 +4,7 @@
     import { onMount } from 'svelte';
     import { account } from '$lib/appwrite';
 	  import { goto } from '$app/navigation';
-
-   
+    import "mapbox-gl/dist/mapbox-gl.css";
 
     onMount(() => {
       checkUser();

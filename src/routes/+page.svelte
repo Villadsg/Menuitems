@@ -2,15 +2,23 @@
   import { onMount } from 'svelte';
   import { writable } from 'svelte/store';
   import { checkUser, user } from '$lib/userStore'; // Import from auth.ts
-
+  import { getCurrentLocation } from '$lib/location'; 
+  import Map from '$lib/Map.svelte';
 
   // Writable store to manage the user state
   let userStatus = writable<Promise<null | object>>(null);
+  let userLocation: [number, number] = [0, 0];
 
- onMount(() => {
+  onMount(async () => {
     checkUser(); // Check user login status when the component is mounted
-  });
 
+    try {
+      const location = await getCurrentLocation();
+      userLocation = [location.latitude, location.longitude];
+    } catch (err) {
+      console.error('Error fetching location:', err);
+    }
+  });
 </script>
 
 <!-- Home page content -->
@@ -20,10 +28,10 @@
   </div>
 {:then user}
   {#if user}
-    <!-- Show MonumentFinder component when logged in -->
+    <!-- Show Map component when logged in -->
     <div class="pt-20">
-      <!-- Put map here-->
-      <p>Here is some interesting info and news. For example a map of all the nearby photos </p>
+      <Map/>
+      <p class="mt-4">Here is some interesting info and news. For example a map of all the nearby photos </p>
     </div>
   {:else}
     <!-- Background image section using Tailwind CSS for not logged-in users -->
@@ -33,13 +41,13 @@
           <h1 class="text-4xl font-bold">Find hidden messages while exploring</h1>
           <p class="mt-4"> Upgrade your experience as a tourist</p>
           <p class="mt-4">Connect your photos and create language learning routes </p>
-                    <div class="mt-6">
-  <a href="/find-quiz">
-    <button class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">
-      Find locations
-    </button>
-  </a>
-  </div>
+          <div class="mt-6">
+            <a href="/find-quiz">
+              <button class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">
+                Find locations
+              </button>
+            </a>
+          </div>
         </div>
       </div>
     </div>
@@ -65,4 +73,3 @@
   <!-- No need to treat it as a critical error -->
   <div>Error loading user status: {error.message}</div>
 {/await}
-

@@ -17,6 +17,7 @@
 
   const databaseId = '6609473fbde756e5dc45';
   const collectionId = '66eefaaf001c2777deb9';
+  
   $: userId = $user?.$id;
 
   let isEditing = false;
@@ -69,19 +70,25 @@
   
 
   const loadMonuments = async () => {
-    try {
-      const response = await databases.listDocuments(
-        databaseId,
-        collectionId,
-        [Query.equal('userId', userId)]
-      );
-      monuments = response.documents;
-      message = monuments.length === 0 ? 'No monument tours created yet.' : '';
-    } catch (error) {
-      console.error('Error loading monuments:', error);
-      message = 'Failed to load monuments.';
-    }
-  };
+  if (!userId) {
+    console.error('User ID is not available yet.');
+    return; // Prevent querying if userId is not set
+  }
+
+  try {
+    const response = await databases.listDocuments(
+      databaseId,
+      collectionId,
+      [Query.equal('userId', userId)]
+    );
+    monuments = response.documents;
+    message = monuments.length === 0 ? 'No monument tours created yet.' : '';
+  } catch (error) {
+    console.error('Error loading monuments:', error);
+    message = 'Failed to load monuments.';
+  }
+};
+
 
   const confirmDelete = async (monument) => {
   if (monument && confirmationName === monument.Route_name) {
