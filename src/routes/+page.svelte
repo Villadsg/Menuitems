@@ -31,7 +31,7 @@
     <!-- Show Map component when logged in -->
     <div class="pt-20">
       <h1>Map of nearby hidden locations</h1>
-      <Map/>
+      
     </div>
   {:else}
     <!-- Background image section using Tailwind CSS for not logged-in users -->
