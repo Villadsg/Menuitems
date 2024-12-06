@@ -127,7 +127,7 @@ const closeTooFarMessage = () => {
 
 </script>
 
-<div class="space-y-4 max-w-md mx-auto pt-20">
+<div class="space-y-4 pt-20">
   {#if showDistanceCheck}
     <DistanceCheck
       distance={selectedMonument.distance}
@@ -146,7 +146,7 @@ const closeTooFarMessage = () => {
   <!-- Only show monument content if on a relevant page -->
   {#if page === 'results'}
     <!-- Main content container -->
-    <div class="max-w-4xl mx-auto p-6 bg-base-100 rounded-lg shadow-lg mt-10">
+    <div class="max-w-4xl mx-auto p-6 bg-base-100 rounded-lg shadow-lg mt-10 sm:max-w-full md:max-w-3xl lg:max-w-4xl"> 
       <h1 class="text-2xl font-bold mb-6 text-center">Map of places</h1>
       <Map monuments={monuments} />
       {#if sortedMonuments.length > 0}
@@ -160,7 +160,7 @@ const closeTooFarMessage = () => {
               <img
                 src="{monument.photoUrl}"
                 alt="{monument.name}"
-                class="my-3 rounded shadow "
+                class="my-3 rounded shadow w-full"
               />
             {/if}
 
