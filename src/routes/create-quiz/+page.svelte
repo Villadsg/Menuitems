@@ -11,6 +11,7 @@
   let routeName = '';
   let Description = '';
   let lat = '';
+  let gpsMessage = '';
   let lng = '';
   let showCoordinatesInput = false; 
   let message = '';
@@ -28,20 +29,29 @@
   
   /** Function to extract coordinates from EXIF metadata */
   const extractPhotoCoordinates = async (file: File) => {
-    try {
-      const metadata = await exifr.gps(file);
-      if (metadata && metadata.latitude && metadata.longitude) {
-        lat = metadata.latitude.toString();
-        lng = metadata.longitude.toString();
-        showCoordinatesInput = false;
-      } else {
-        showCoordinatesInput = true;
-      }
-    } catch (error) {
-      console.error("Could not extract coordinates from photo:", error);
+  try {
+    const metadata = await exifr.parse(file, { gps: true });
+    console.log('Full EXIF metadata:', metadata);
+    if (metadata && metadata.GPSLatitude && metadata.GPSLongitude) {
+      lat = metadata.GPSLatitude.toString();
+      lng = metadata.GPSLongitude.toString();
+      showCoordinatesInput = false;
+      
+      if (lat && lng) {
+  gpsMessage = 'GPS data was successfully loaded from the photo.';
+} else {
+  gpsMessage = 'Photo has no GPS data. Please enter manually or use current location.';
+}
+
+    } else {
+      console.warn('No valid GPS data found in metadata.');
       showCoordinatesInput = true;
     }
-  };
+  } catch (error) {
+    console.error("Could not extract coordinates from photo:", error);
+    showCoordinatesInput = true;
+  }
+};
 
   const handlePhotoUpload = async (event: Event) => {
   const input = event.target as HTMLInputElement;
@@ -227,6 +237,10 @@
               class="input input-bordered w-full" 
               on:change={handlePhotoUpload} 
             />
+            
+            {#if gpsMessage}
+    <p class="text-sm text-gray-600 mt-2">{gpsMessage}</p>
+  {/if}
           </div>
 
           {#if showCoordinatesInput}
