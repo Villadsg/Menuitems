@@ -209,43 +209,52 @@
         loading = false;
       }
     };
+
+let photoPreviewUrl: string | null = null; // To store the URL of the uploaded photo
+
+// Function to handle navigation to the photo preview page
+const goToPhotoPreview = () => {
+  if (filesMainPhoto && filesMainPhoto[0]) {
+    const file = filesMainPhoto[0];
+    photoPreviewUrl = URL.createObjectURL(file); // Create a URL for the uploaded photo
+    currentPage = 'photoPreviewPage'; // Navigate to the photo preview page
+  }
+};
+
   </script>
   
   
-  
-  <!-- Wrapper div -->
   <div class="pt-20">
-    {#key currentPage}
-      <div transition:fly={{ x: 200, duration: 300 }} class="space-y-4 max-w-md mx-auto">
-        {#if currentPage === 'beginSection'}
-          <!-- First Section (Monument Form) -->
-          <h1 class="text-2xl font-bold mb-4">Add your menu to MenuMaps</h1>
-          <form on:submit|preventDefault={submitQuiz} class="space-y-4 max-w-md mx-auto">
-            <div>
-              <label for="routeName" class="label">Name of Place</label>
-              <input id="routeName" type="text" bind:value={routeName} placeholder="'Best Bakery'" required class="input input-bordered w-full" />
-            </div>
-  
-            <div>
-              <h3 class="text-lg font-bold">Add Menu</h3>
-              <input 
-                id="photo" 
-                type="file" 
-                bind:files={filesMainPhoto} 
-                accept="image/*" 
-                required 
-                class="input input-bordered w-full" 
-                on:change={handlePhotoUpload} 
-              />
-              
-              {#if gpsMessage}
-      <p class="text-sm text-gray-600 mt-2">{gpsMessage}</p>
-    {/if}
-            </div>
-  
-            {#if showCoordinatesInput}
+  {#key currentPage}
+    <div transition:fly={{ x: 200, duration: 300 }} class="space-y-4 max-w-md mx-auto">
+      {#if currentPage === 'beginSection'}
+        <!-- First Section (Monument Form) -->
+        <h1 class="text-2xl font-bold mb-4">Add your menu to MenuMaps</h1>
+        <form on:submit|preventDefault={submitQuiz} class="space-y-4 max-w-md mx-auto">
+          <div>
+            <label for="routeName" class="label">Name of Place</label>
+            <input id="routeName" type="text" bind:value={routeName} placeholder="'Best Bakery'" required class="input input-bordered w-full" />
+          </div>
+
+          <div>
+            <h3 class="text-lg font-bold">Add Menu</h3>
+            <input 
+              id="photo" 
+              type="file" 
+              bind:files={filesMainPhoto} 
+              accept="image/*" 
+              required 
+              class="input input-bordered w-full" 
+              on:change={handlePhotoUpload} 
+            />
+            
+            {#if gpsMessage}
+              <p class="text-sm text-gray-600 mt-2">{gpsMessage}</p>
+            {/if}
+          </div>
+
+          {#if showCoordinatesInput}
             <h2 class="font-bold">Enter Coordinates Manually</h2>
-           
             <div>
               <label for="lat" class="label">Latitude</label>
               <input id="lat" type="number" step="any" bind:value={lat} placeholder="Enter Latitude" required class="input input-bordered w-full" />
@@ -254,7 +263,6 @@
               <label for="lng" class="label">Longitude</label>
               <input id="lng" type="number" step="any" bind:value={lng} placeholder="Enter Longitude" required class="input input-bordered w-full" />
             </div>
-           
             <button type="button" class="btn btn-outline w-full" on:click={fetchCurrentLocation} disabled={loading}>
               {#if loading}
                 <span class="loading loading-spinner"></span> Loading...
@@ -262,35 +270,45 @@
                 Use Current Location
               {/if}
             </button>
-            {/if}
-            
-            <div>
-              <label for="Description" class="label">Menu Description</label>
-              <textarea id="Description" bind:value={Description} placeholder="'A house build with wood'" required class="textarea textarea-bordered w-full h-24"></textarea>
-              
-        
-              
-            </div>
-            
-            
-           <button type="button" class="btn btn-success w-full mt-3" on:click={submitQuiz}>
-    {#if loading}
-    <span class="loading loading-spinner"></span> Submitting...
-  {:else}
-    Submit
-  {/if}
-  </button>
-          </form>
-  
-        {:else if currentPage === 'confirmationPage'}
-          <!-- Confirmation Page -->
-          <div transition:fly={{ x: 200, duration: 300 }} class="space-y-4 max-w-md mx-auto text-center">
-            <h2 class="text-2xl font-bold">Success!</h2>
-            <p>Your location was submitted successfully</p>
-            <p>Redirecting you to the main page...</p>
+          {/if}
+          
+          <div>
+            <label for="Description" class="label">Menu Description</label>
+            <textarea id="Description" bind:value={Description} placeholder="'A house build with wood'" required class="textarea textarea-bordered w-full h-24"></textarea>
           </div>
-        {/if}
-      </div>
-    {/key}
-  </div>
-  
+          
+          <button type="button" class="btn btn-success w-full mt-3" on:click={goToPhotoPreview}>
+            Next
+          </button>
+        </form>
+
+      {:else if currentPage === 'photoPreviewPage'}
+        <!-- Photo Preview Page -->
+        <div transition:fly={{ x: 200, duration: 300 }} class="space-y-4 max-w-md mx-auto text-center">
+          <h2 class="text-2xl font-bold">Menu Preview</h2>
+          {#if photoPreviewUrl}
+            <img src={photoPreviewUrl} alt="Uploaded Photo" class="w-full h-auto rounded-lg" />
+          {/if}
+          <button type="button" class="btn btn-success w-full mt-3" on:click={submitQuiz}>
+            {#if loading}
+              <span class="loading loading-spinner"></span> Submitting...
+            {:else}
+              Submit
+            {/if}
+          </button>
+          <button type="button" class="btn btn-outline w-full mt-3" on:click={() => currentPage = 'beginSection'}>
+            Go Back
+          </button>
+        </div>
+
+      {:else if currentPage === 'confirmationPage'}
+        <!-- Confirmation Page -->
+        <div transition:fly={{ x: 200, duration: 300 }} class="space-y-4 max-w-md mx-auto text-center">
+          <h2 class="text-2xl font-bold">Success!</h2>
+          <p>Your location was submitted successfully</p>
+          <p>Redirecting you to the main page...</p>
+        </div>
+      {/if}
+    </div>
+  {/key}
+</div>

@@ -17,7 +17,7 @@
       <!-- About the Creator -->
       <h1 class="text-2xl font-bold mb-2">About the Creator</h1>
       <p class="text-gray-600 text-base mb-4">
-        Hi I'm Gorm Villads!
+        Hi what's up
   
       <p class="text-gray-600 text-base mb-4">
         

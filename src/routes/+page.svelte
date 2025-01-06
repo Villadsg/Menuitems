@@ -35,11 +35,11 @@
     </div>
   {:else}
     <!-- Background image section using Tailwind CSS for not logged-in users -->
-    <div class="bg-cover bg-center bg-no-repeat h-screen" style="background-image: url('/baggie.jpeg')">
+    <div class="bg-cover bg-center bg-no-repeat h-screen" style="background-image: url('/baggie4.jpg')">
       <div class="flex flex-col items-center justify-center h-full bg-black bg-opacity-50">
         <div class="text-center text-white p-4">
           <h1 class="text-4xl font-bold mb-4">Find Menus Nearby</h1>
-          <p class="mb-6">Get a quick overview of available food options.</p>
+
           <div class="space-y-4">
             <a href="/find-quiz">
               <button class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-full transition duration-300">
@@ -47,7 +47,7 @@
               </button>
             </a>
             <a href="/addmenu">
-              <button class="bg-transparent border border-green-500 hover:bg-green-500 text-white font-bold py-2 px-6 rounded-full transition duration-300">
+              <button class="bg-green-500 border border-green-500 hover:bg-green-500 text-white font-bold py-2 px-6 rounded-full transition duration-300">
                 Add Your Menu
               </button>
             </a>
@@ -65,7 +65,7 @@
 
           <!-- For Visitors -->
           <div class="bg-white p-6 rounded-lg shadow-md">
-            <h3 class="text-xl font-semibold mb-4">For customers</h3>
+            <h3 class="text-xl font-semibold mb-4">For Customers</h3>
             <ul class="space-y-4">
               <li class="flex items-start">
                 <span class="text-green-500 mr-2">-</span>
@@ -92,7 +92,7 @@
                   </li>
                   <li class="flex items-start">
                     <span class="text-green-500 mr-2">-</span>
-                    <span>Upload your menu and let MenuMap improve it for free.</span>
+                    <span>Let MenuMap improve and translate your menu for free.</span>
                   </li>
                   <li class="flex items-start">
                     <span class="text-green-500 mr-2">-</span>
@@ -112,7 +112,7 @@
       </div> 
       <div>
         <span class="footer-title">Services</span> 
-        <a href="/selectlanguage" class="link link-hover">Find the menus nearby</a>
+        <a href="/find-quiz" class="link link-hover">Find the menus nearby</a>
       </div> 
       <div>
         <span class="footer-title">Company</span> 
