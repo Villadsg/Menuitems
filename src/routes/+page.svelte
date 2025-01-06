@@ -74,7 +74,7 @@
           </div>
           <div class="card bg-base-100 shadow-md">
             <div class="card-body p-4">
-              <p>Follow other customer's opinions on their order and not just the place</p>
+              <p>Follow other customer's opinions on their specific order</p>
             </div>
           </div>
         </div>
