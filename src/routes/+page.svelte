@@ -35,7 +35,7 @@
     </div>
   {:else}
     <!-- Background image section using Tailwind CSS for not logged-in users -->
-    <div class="bg-cover bg-center bg-no-repeat h-screen" style="background-image: url('/back.jpeg')">
+    <div class="bg-cover bg-center bg-no-repeat h-screen" style="background-image: url('/baggie.jpeg')">
       <div class="flex flex-col items-center justify-center h-full bg-black bg-opacity-50">
         <div class="text-center text-white p-4">
           <h1 class="text-4xl font-bold mb-4">Find Menus Nearby</h1>
@@ -46,7 +46,7 @@
                 Explore Menus
               </button>
             </a>
-            <a href="/find-quiz">
+            <a href="/addmenu">
               <button class="bg-transparent border border-green-500 hover:bg-green-500 text-white font-bold py-2 px-6 rounded-full transition duration-300">
                 Add Your Menu
               </button>
@@ -56,15 +56,63 @@
       </div>
     </div>
 
+    <!-- Feature Description Section -->
+    <div class="py-12 bg-gray-50">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <h2 class="text-3xl font-bold text-center mb-8">Why MenuMap?</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+     
+
+          <!-- For Visitors -->
+          <div class="bg-white p-6 rounded-lg shadow-md">
+            <h3 class="text-xl font-semibold mb-4">For customers</h3>
+            <ul class="space-y-4">
+              <li class="flex items-start">
+                <span class="text-green-500 mr-2">-</span>
+                <span>See what your closest restaurants can offer today.</span>
+              </li>
+              <li class="flex items-start">
+                <span class="text-green-500 mr-2">-</span>
+                <span>Discover hidden gems and unique dishes</span>
+              </li>
+              <li class="flex items-start">
+                <span class="text-green-500 mr-2">-</span>
+                <span>Follow other customer's opinions on their order and not just the place</span>
+              </li>
+            </ul>
+          </div>
+
+               <!-- For Shops -->
+               <div class="bg-white p-6 rounded-lg shadow-md">
+                <h3 class="text-xl font-semibold mb-4">For Shops</h3>
+                <ul class="space-y-4">
+                  <li class="flex items-start">
+                    <span class="text-green-500 mr-2">-</span>
+                    <span>Get your unique products highlighted in your area.</span>
+                  </li>
+                  <li class="flex items-start">
+                    <span class="text-green-500 mr-2">-</span>
+                    <span>Upload your menu and let MenuMap improve it for free.</span>
+                  </li>
+                  <li class="flex items-start">
+                    <span class="text-green-500 mr-2">-</span>
+                    <span>Schedule permanent or temporary changes to the menu effortlessly.</span>
+                  </li>
+                </ul>
+              </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Footer -->
     <footer class="footer p-5 bg-neutral text-neutral-content">
       <div>
-        <p class="font-bold">Langtour™</p>
+        <p class="font-bold">MenuMap™</p>
         <p>© 2024 - All rights reserved</p>
       </div> 
       <div>
         <span class="footer-title">Services</span> 
-        <a href="/selectlanguage" class="link link-hover">Find the Closest Route</a>
+        <a href="/selectlanguage" class="link link-hover">Find the menus nearby</a>
       </div> 
       <div>
         <span class="footer-title">Company</span> 
