@@ -31,8 +31,7 @@
   {#if user}
     <!-- Show Map component when logged in -->
     <div class="pt-20">
-      <h1 class="text-2xl font-bold text-center mb-4">Map of Nearby Hidden Locations</h1>
-      <Map />
+    
     </div>
   {:else}
     <!-- Hero Section -->
