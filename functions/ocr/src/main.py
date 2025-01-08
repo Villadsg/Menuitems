@@ -1,39 +1,70 @@
 from appwrite.client import Client
-from appwrite.services.users import Users
+from appwrite.services.storage import Storage
+from appwrite.input_file import InputFile
 from appwrite.exception import AppwriteException
+import easyocr
 import os
+import tempfile
 
-# This Appwrite function will be executed every time your function is triggered
+# Initialize EasyOCR reader
+def extract_text_from_image(image_path, languages=['en']):
+    reader = easyocr.Reader(languages)
+    result = reader.readtext(image_path)
+    extracted_text = [detection[1] for detection in result]
+    return extracted_text
+
+# Main function
 def main(context):
-    # You can use the Appwrite SDK to interact with other services
-    # For this example, we're using the Users service
+    # Initialize Appwrite client
     client = (
         Client()
         .set_endpoint(os.environ["APPWRITE_FUNCTION_API_ENDPOINT"])
         .set_project(os.environ["APPWRITE_FUNCTION_PROJECT_ID"])
         .set_key(context.req.headers["x-appwrite-key"])
     )
-    users = Users(client)
 
+    # Parse the request payload
     try:
-        response = users.list()
-        # Log messages and errors to the Appwrite Console
-        # These logs won't be seen by your end users
-        context.log("Total users: " + str(response["total"]))
-    except AppwriteException as err:
-        context.error("Could not list users: " + repr(err))
+        payload = context.req.body
+        image_file_id = payload.get("imageFileId")
+        language = payload.get("language", "en")
 
-    # The req object contains the request data
-    if context.req.path == "/ping":
-        # Use res object to respond with text(), json(), or binary()
-        # Don't forget to return a response!
-        return context.res.text("Pong")
+        if not image_file_id:
+            return context.res.json({
+                "status": "error",
+                "message": "imageFileId is required in the payload."
+            }, 400)
 
-    return context.res.json(
-        {
-            "motto": "Build like a team of hundreds_",
-            "learn": "https://appwrite.io/docs",
-            "connect": "https://appwrite.io/discord",
-            "getInspired": "https://builtwith.appwrite.io",
-        }
-    )
+        # Download the image file from Appwrite Storage
+        storage = Storage(client)
+        image_file = storage.get_file_download(image_file_id)
+
+        # Save the image to a temporary file
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as temp_file:
+            temp_file.write(image_file)
+            temp_image_path = temp_file.name
+
+        # Extract text from the image
+        extracted_text = extract_text_from_image(temp_image_path, languages=[language])
+
+        # Clean up the temporary file
+        os.remove(temp_image_path)
+
+        # Return the extracted text
+        return context.res.json({
+            "status": "success",
+            "extractedText": extracted_text
+        })
+
+    except AppwriteException as e:
+        context.error(f"Appwrite error: {str(e)}")
+        return context.res.json({
+            "status": "error",
+            "message": str(e)
+        }, 500)
+    except Exception as e:
+        context.error(f"Unexpected error: {str(e)}")
+        return context.res.json({
+            "status": "error",
+            "message": str(e)
+        }, 500)
