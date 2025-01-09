@@ -45,8 +45,9 @@
               <button class="bg-green-500 btn btn-primary w-full">Explore Menus</button>
             </a>
             <a href="/addmenu">
-              <button class="bg-green-500 btn btn-primary w-full">Add Your Menu</button>
+              <button class="bg-green-500 btn btn-primary w-full">Add Your Menu (OCR)</button>
             </a>
+         
           </div>
         </div>
       </div>
@@ -68,7 +69,7 @@
           </div>
           <div class="card bg-base-100 shadow-md">
             <div class="card-body p-4">
-              <p>Discover hidden gems and unique dishes</p>
+              <p>Discover unique dishes</p>
             </div>
           </div>
           <div class="card bg-base-100 shadow-md">
