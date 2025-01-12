@@ -1,4 +1,0 @@
-easyocr
-opencv-python-headless==4.10.0.84
-scikit-image==0.24.0
-appwrite
