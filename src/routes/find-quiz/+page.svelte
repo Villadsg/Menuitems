@@ -147,8 +147,7 @@ const closeTooFarMessage = () => {
   {#if page === 'results'}
     <!-- Main content container -->
     <div class="max-w-4xl mx-auto p-6 bg-base-100 rounded-lg shadow-lg mt-10 sm:max-w-full md:max-w-3xl lg:max-w-4xl"> 
-      <h1 class="text-2xl font-bold mb-6 text-center">Map of places</h1>
-      <Map monuments={monuments} />
+     
       {#if sortedMonuments.length > 0}
         <h1 class="text-2xl font-bold mb-6 text-center">List of places Nearby</h1>
         {#each sortedMonuments as monument}
@@ -185,6 +184,8 @@ const closeTooFarMessage = () => {
       {:else}
         <p class="text-center text-gray-500">No monuments found.</p>
       {/if}
+       <h1 class="text-2xl font-bold mb-6 text-center">Map of places</h1>
+      <Map monuments={monuments} />
 
       <button
         class="btn btn-outline w-full mt-6"
