@@ -16,6 +16,7 @@
   let showCoordinatesInput = false;
   let message = '';
   let languages = ['ES', 'IT', 'DA', 'JA'];
+let menuSections: MenuSection[] = [];
 
   let selectedLanguage = 'EN'; // Default language is English
   const availableLanguages = [
@@ -25,6 +26,14 @@
     { code: 'DA', name: 'Danish' },
     { code: 'JA', name: 'Japanese' }
   ];
+  
+const ocrLanguageMap: Record<string, string> = {
+  EN: 'eng', // English
+  ES: 'spa', // Spanish
+  IT: 'ita', // Italian
+  DA: 'dan', // Danish
+  JA: 'jpn', // Japanese
+};
 
   const currentDate = new Date().toISOString().slice(0, 16).replace('T', ' ');
 
@@ -43,32 +52,114 @@
   let extractedText: string | null = null; // To store the extracted text from OCR
 
   /** Function to extract text using OCR.space API */
-  async function extractTextWithOCR(file: File) {
-    const formData = new FormData();
-    formData.append('file', file);
-    // Add the engine parameter to use Engine 2
-  formData.append('OCREngine', '2');
+  async function extractTextWithOCR(file: File, languageCode: string) {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('isTable', 'true'); // Enable table detection
+  formData.append('detectOrientation', 'true'); // Detect text orientation
+  formData.append('OCREngine', '2'); // Use Engine 2 for better accuracy
+  formData.append('language', ocrLanguageMap[languageCode] || 'eng');
+
+  try {
+    const response = await fetch('https://api.ocr.space/parse/image', {
+      method: 'POST',
+      headers: { apikey: 'K83293183388957' }, // Replace with your OCR.space API key
+      body: formData,
+    });
+
+    const data = await response.json();
+    if (data.IsErroredOnProcessing) {
+      throw new Error(data.ErrorMessage || 'OCR processing failed');
+    }
+
+    // Extract and return the parsed text and text overlay
+    const parsedText = data.ParsedResults[0].ParsedText;
+    const textOverlay = data.ParsedResults[0].TextOverlay;
+    return { parsedText, textOverlay };
+  } catch (error) {
+    console.error('OCR Error:', error);
+    return null;
+  }
+}
 
 
-    try {
-      const response = await fetch('https://api.ocr.space/parse/image', {
-        method: 'POST',
-        headers: { apikey: 'K83293183388957' }, // Replace with your OCR.space API key
-        body: formData,
-      });
+interface Word {
+  WordText: string;
+  Left: number;
+  Top: number;
+  Width: number;
+  Height: number;
+}
 
-      const data = await response.json();
-      if (data.IsErroredOnProcessing) {
-        throw new Error(data.ErrorMessage || 'OCR processing failed');
+interface Line {
+  Words: Word[];
+}
+
+interface TextOverlay {
+  Lines: Line[];
+}
+
+interface MenuSection {
+  name: string;
+  items: { name: string; price: string; location: { left: number; top: number } }[];
+}
+
+function parseMenuFromTextOverlay(textOverlay: TextOverlay): MenuSection[] {
+  const menuSections: MenuSection[] = [];
+  let currentSection: MenuSection | null = null;
+
+  for (const line of textOverlay.Lines) {
+    const words = line.Words;
+
+    // Check if the line is a section header (e.g., centered or larger font)
+    if (isSectionHeader(words)) {
+      currentSection = {
+        name: words.map((word) => word.WordText).join(' '),
+        items: [],
+      };
+      menuSections.push(currentSection);
+    } else if (currentSection) {
+      // Group words into menu items and prices
+      const item = parseMenuItem(words);
+      if (item) {
+        currentSection.items.push(item);
       }
-
-      // Extract and return the parsed text
-      return data.ParsedResults[0].ParsedText;
-    } catch (error) {
-      console.error('OCR Error:', error);
-      return null;
     }
   }
+
+  return menuSections;
+}
+
+function isSectionHeader(words: Word[]): boolean {
+  // Example logic: Check if the text is centered or has a larger font size
+  const firstWord = words[0];
+  const lastWord = words[words.length - 1];
+  const lineWidth = lastWord.Left + lastWord.Width - firstWord.Left;
+  return lineWidth < 300; // Adjust threshold based on your menu layout
+}
+
+function parseMenuItem(words: Word[]): { name: string; price: string; location: { left: number; top: number } } | null {
+  const itemWords: string[] = [];
+  let price = '';
+
+  for (const word of words) {
+    if (word.WordText.startsWith('$')) {
+      price = word.WordText;
+    } else {
+      itemWords.push(word.WordText);
+    }
+  }
+
+  if (itemWords.length > 0 && price) {
+    return {
+      name: itemWords.join(' '),
+      price,
+      location: { left: words[0].Left, top: words[0].Top },
+    };
+  }
+
+  return null;
+}
 
   /** Function to extract coordinates from EXIF metadata */
   const extractPhotoCoordinates = async (file: File) => {
@@ -89,32 +180,49 @@
     }
   };
 
-  const handlePhotoUpload = async (event: Event) => {
-    const input = event.target as HTMLInputElement;
-    filesMainPhoto = input.files;
+const handlePhotoUpload = async (event: Event) => {
+  const input = event.target as HTMLInputElement;
+  filesMainPhoto = input.files;
 
-    if (filesMainPhoto && filesMainPhoto[0]) {
-      const originalFile = filesMainPhoto[0];
-      await extractPhotoCoordinates(originalFile);
+  if (filesMainPhoto && filesMainPhoto[0]) {
+    const originalFile = filesMainPhoto[0];
+    await extractPhotoCoordinates(originalFile);
 
-      if (showCoordinatesInput) {
-        const useLocation = confirm('Photo has no GPS data. Would you like to use your current location as the shop location?');
-        if (useLocation) {
-          await fetchCurrentLocation();
-        }
-      }
-
-      try {
-        compressedFile = await compressImage(originalFile);
-
-        // Extract text using OCR.space API
-        extractedText = await extractTextWithOCR(compressedFile);
-      } catch (error) {
-        message = 'Failed to process the photo.';
-        compressedFile = null;
+    if (showCoordinatesInput) {
+      const useLocation = confirm('Photo has no GPS data. Would you like to use your current location as the shop location?');
+      if (useLocation) {
+        await fetchCurrentLocation();
       }
     }
-  };
+
+    try {
+      compressedFile = await compressImage(originalFile);
+
+      // Extract text and text overlay using OCR.space API
+      const ocrResult = await extractTextWithOCR(compressedFile, selectedLanguage);
+
+      if (ocrResult) {
+        const { parsedText, textOverlay } = ocrResult;
+
+        // Store the parsed text (if needed)
+        extractedText = parsedText;
+
+        // Process the text overlay to group words into logical sections
+        menuSections = parseMenuFromTextOverlay(textOverlay);
+
+        // Log or store the structured menu data
+        console.log('Structured Menu Data:', menuSections);
+
+        // Optionally, update your UI or state with the structured menu data
+        // For example, you can store it in a Svelte store or pass it to a component
+      }
+    } catch (error) {
+      console.error('Failed to process the photo:', error);
+      message = 'Failed to process the photo.';
+      compressedFile = null;
+    }
+  }
+};
 
   const uploadMainPhoto = async () => {
     try {
@@ -214,6 +322,10 @@
             <label for="routeName" class="label">Name of Place</label>
             <input id="routeName" type="text" bind:value={routeName} placeholder="'Best Bakery'" required class="input input-bordered w-full" />
           </div>
+           <div class="form-control">
+            <label for="Description" class="label">Menu page Name</label>
+            <textarea id="Description" bind:value={Description} placeholder="'Drinks'" required class="textarea textarea-bordered"></textarea>
+          </div>
 
           <div class="form-control">
             <label for="photo" class="label">Add Menu Photo</label>
@@ -255,10 +367,7 @@
               {/each}
             </select>
           </div>
-          <div class="form-control">
-            <label for="Description" class="label">Menu Description</label>
-            <textarea id="Description" bind:value={Description} placeholder="'Build your own salad'" required class="textarea textarea-bordered w-full h-24"></textarea>
-          </div>
+         
 
           <button type="button" class="btn btn-primary w-full mt-3" on:click={goToPhotoPreview}>
             Next
@@ -273,15 +382,27 @@
             <img src={photoPreviewUrl} alt="Uploaded Photo" class="w-full h-auto rounded-lg shadow-md" />
           {/if}
 
-          <!-- Display Extracted Text -->
-          {#if extractedText}
-            <div class="form-control">
-              <label class="label">Extracted Text</label>
-              <div class="p-4 bg-gray-100 rounded-lg text-left">
-                <pre>{extractedText}</pre>
-              </div>
-            </div>
-          {/if}
+<!-- Display Structured Menu Data -->
+{#if menuSections && menuSections.length > 0}
+  <div class="form-control">
+    <label class="label">Structured Menu</label>
+    <div class="p-4 bg-gray-100 rounded-lg text-left">
+      {#each menuSections as section}
+        <div class="menu-section mb-6">
+          <h2 class="section-title font-bold text-lg mb-2">{section.name}</h2>
+          <ul class="menu-items">
+            {#each section.items as item}
+              <li class="menu-item mb-2">
+                <span class="item-name">{item.name}</span>
+                <span class="item-price font-bold ml-2">{item.price}</span>
+              </li>
+            {/each}
+          </ul>
+        </div>
+      {/each}
+    </div>
+  </div>
+{/if}
 
           <!-- Add User ID Input Field -->
           <div class="form-control">
