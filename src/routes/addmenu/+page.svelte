@@ -1,3 +1,7 @@
+<svelte:head>
+  <script async src="https://docs.opencv.org/4.x/opencv.js" type="text/javascript"></script>
+</svelte:head>
+
 <script lang="ts">
   import { databases, storage, ID, Permission, Role } from '$lib/appwrite';
   import { goto } from '$app/navigation';
@@ -50,77 +54,113 @@ const ocrLanguageMap: Record<string, string> = {
 
   let photoPreviewUrl: string | null = null; // To store the URL of the uploaded photo
   let extractedText: string | null = null; // To store the extracted text from OCR
+import Tesseract from 'tesseract.js';
+import cv2 from 'opencv.js';
 
-  /** Function to extract text using OCR.space API */
-  async function extractTextWithOCR(file: File, languageCode: string) {
-  const formData = new FormData();
-  formData.append('file', file);
-  formData.append('isTable', 'true'); // Enable table detection
-  formData.append('detectOrientation', 'true'); // Detect text orientation
-  formData.append('OCREngine', '2'); // Use Engine 2 for better accuracy
-  formData.append('language', ocrLanguageMap[languageCode] || 'eng');
+ import { onMount } from 'svelte';
 
+  let cv: any;
+
+  onMount(() => {
+    // Wait for OpenCV.js to initialize
+    cv['onRuntimeInitialized'] = () => {
+      console.log('OpenCV.js is ready!');
+      // Your OpenCV code here
+    };
+  });
+  
+  
+
+function preprocessImage(imageFile: File): Promise<File> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.src = URL.createObjectURL(imageFile);
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const mat = cv.matFromImageData(imageData);
+      const gray = new cv.Mat();
+      cv.cvtColor(mat, gray, cv.COLOR_RGBA2GRAY, 0);
+      const binary = new cv.Mat();
+      cv.threshold(gray, binary, 0, 255, cv.THRESH_BINARY | cv.THRESH_OTSU);
+
+      const processedImageData = new ImageData(
+        new Uint8ClampedArray(binary.data),
+        binary.cols,
+        binary.rows
+      );
+      ctx.putImageData(processedImageData, 0, 0);
+
+      canvas.toBlob((blob) => {
+        const processedFile = new File([blob], imageFile.name, { type: 'image/png' });
+        resolve(processedFile);
+      }, 'image/png');
+    };
+    img.onerror = reject;
+  });
+}
+
+async function extractTextWithTesseract(file: File, languageCode: string) {
   try {
-    const response = await fetch('https://api.ocr.space/parse/image', {
-      method: 'POST',
-      headers: { apikey: 'K83293183388957' }, // Replace with your OCR.space API key
-      body: formData,
+    const { data } = await Tesseract.recognize(file, languageCode, {
+      logger: (m) => console.log(m), // Optional: Log progress
     });
 
-    const data = await response.json();
-    if (data.IsErroredOnProcessing) {
-      throw new Error(data.ErrorMessage || 'OCR processing failed');
-    }
-
-    // Extract and return the parsed text and text overlay
-    const parsedText = data.ParsedResults[0].ParsedText;
-    const textOverlay = data.ParsedResults[0].TextOverlay;
-    return { parsedText, textOverlay };
+    const parsedText = data.text;
+    return { parsedText };
   } catch (error) {
-    console.error('OCR Error:', error);
+    console.error('Tesseract Error:', error);
     return null;
   }
 }
 
+function parseHocrOutput(hocr: string): TextOverlay {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(hocr, 'text/html');
+  const lines: Line[] = [];
 
-interface Word {
-  WordText: string;
-  Left: number;
-  Top: number;
-  Width: number;
-  Height: number;
+  // Example: Parse hocr to extract words and their bounding boxes
+  const wordElements = doc.querySelectorAll('.ocrx_word');
+  wordElements.forEach((wordElement) => {
+    const wordText = wordElement.textContent?.trim() || '';
+    const bbox = wordElement.getAttribute('title')?.split(' '); // Extract bounding box
+    if (bbox && bbox.length >= 4) {
+      const word: Word = {
+        WordText: wordText,
+        Left: parseInt(bbox[1]),
+        Top: parseInt(bbox[2]),
+        Width: parseInt(bbox[3]) - parseInt(bbox[1]),
+        Height: parseInt(bbox[4]) - parseInt(bbox[2]),
+      };
+      // Group words into lines (you may need to implement this logic)
+      // ...
+    }
+  });
+
+  return { Lines: lines };
 }
 
-interface Line {
-  Words: Word[];
-}
-
-interface TextOverlay {
-  Lines: Line[];
-}
-
-interface MenuSection {
-  name: string;
-  items: { name: string; price: string; location: { left: number; top: number } }[];
-}
-
-function parseMenuFromTextOverlay(textOverlay: TextOverlay): MenuSection[] {
+function parseMenuFromText(text: string): MenuSection[] {
   const menuSections: MenuSection[] = [];
   let currentSection: MenuSection | null = null;
 
-  for (const line of textOverlay.Lines) {
-    const words = line.Words;
-
-    // Check if the line is a section header (e.g., centered or larger font)
-    if (isSectionHeader(words)) {
+  const lines = text.split('\n');
+  for (const line of lines) {
+    // Check if the line is a section header (e.g., all caps or contains specific keywords)
+    if (isSectionHeader(line)) {
       currentSection = {
-        name: words.map((word) => word.WordText).join(' '),
+        name: line.trim(),
         items: [],
       };
       menuSections.push(currentSection);
     } else if (currentSection) {
-      // Group words into menu items and prices
-      const item = parseMenuItem(words);
+      // Group lines into menu items and prices
+      const item = parseMenuItem(line);
       if (item) {
         currentSection.items.push(item);
       }
@@ -130,37 +170,23 @@ function parseMenuFromTextOverlay(textOverlay: TextOverlay): MenuSection[] {
   return menuSections;
 }
 
-function isSectionHeader(words: Word[]): boolean {
-  // Example logic: Check if the text is centered or has a larger font size
-  const firstWord = words[0];
-  const lastWord = words[words.length - 1];
-  const lineWidth = lastWord.Left + lastWord.Width - firstWord.Left;
-  return lineWidth < 300; // Adjust threshold based on your menu layout
+function isSectionHeader(line: string): boolean {
+  // Example logic: Check if the line is in all caps or contains specific keywords
+  return line === line.toUpperCase() || line.includes('Menu') || line.includes('Section');
 }
 
-function parseMenuItem(words: Word[]): { name: string; price: string; location: { left: number; top: number } } | null {
-  const itemWords: string[] = [];
-  let price = '';
-
-  for (const word of words) {
-    if (word.WordText.startsWith('$')) {
-      price = word.WordText;
-    } else {
-      itemWords.push(word.WordText);
-    }
-  }
-
-  if (itemWords.length > 0 && price) {
+function parseMenuItem(line: string): { name: string; price: string } | null {
+  const priceMatch = line.match(/\$\d+(\.\d{2})?/); // Match prices like $10.00
+  if (priceMatch) {
+    const price = priceMatch[0];
+    const name = line.replace(price, '').trim();
     return {
-      name: itemWords.join(' '),
+      name,
       price,
-      location: { left: words[0].Left, top: words[0].Top },
     };
   }
-
   return null;
 }
-
   /** Function to extract coordinates from EXIF metadata */
   const extractPhotoCoordinates = async (file: File) => {
     try {
@@ -180,7 +206,7 @@ function parseMenuItem(words: Word[]): { name: string; price: string; location: 
     }
   };
 
-const handlePhotoUpload = async (event: Event) => {
+async function handlePhotoUpload(event: Event) {
   const input = event.target as HTMLInputElement;
   filesMainPhoto = input.files;
 
@@ -196,25 +222,32 @@ const handlePhotoUpload = async (event: Event) => {
     }
 
     try {
-      compressedFile = await compressImage(originalFile);
+      // Preprocess the image
+      const preprocessedFile = await preprocessImage(originalFile);
+      compressedFile = await compressImage(preprocessedFile);
 
-      // Extract text and text overlay using OCR.space API
-      const ocrResult = await extractTextWithOCR(compressedFile, selectedLanguage);
+      // Extract text using Tesseract.js with custom configuration
+      const ocrResult = await extractTextWithTesseract(compressedFile, ocrLanguageMap[selectedLanguage], {
+        tessedit_pageseg_mode: '6', // PSM_SINGLE_BLOCK
+        tessedit_ocr_engine_mode: '1', // OEM_LSTM_ONLY
+      });
 
       if (ocrResult) {
-        const { parsedText, textOverlay } = ocrResult;
+        const { parsedText } = ocrResult;
+
+        // Correct spelling
+        const correctedText = correctSpelling(parsedText);
 
         // Store the parsed text (if needed)
-        extractedText = parsedText;
+        extractedText = correctedText;
 
-        // Process the text overlay to group words into logical sections
-        menuSections = parseMenuFromTextOverlay(textOverlay);
+        // Process the text to group words into logical sections
+        menuSections = parseMenuFromText(correctedText);
 
         // Log or store the structured menu data
         console.log('Structured Menu Data:', menuSections);
 
         // Optionally, update your UI or state with the structured menu data
-        // For example, you can store it in a Svelte store or pass it to a component
       }
     } catch (error) {
       console.error('Failed to process the photo:', error);
@@ -222,8 +255,8 @@ const handlePhotoUpload = async (event: Event) => {
       compressedFile = null;
     }
   }
-};
-
+}
+ 
   const uploadMainPhoto = async () => {
     try {
       if (compressedFile) {
@@ -381,8 +414,16 @@ const handlePhotoUpload = async (event: Event) => {
           {#if photoPreviewUrl}
             <img src={photoPreviewUrl} alt="Uploaded Photo" class="w-full h-auto rounded-lg shadow-md" />
           {/if}
-
-<!-- Display Structured Menu Data -->
+ <!-- Display Raw OCR Output -->
+          {#if extractedText}
+            <div class="form-control">
+              <label class="label">Raw OCR Output</label>
+              <div class="p-4 bg-gray-100 rounded-lg text-left">
+                <pre class="whitespace-pre-wrap break-words">{extractedText}</pre>
+              </div>
+            </div>
+          {/if}
+          
 {#if menuSections && menuSections.length > 0}
   <div class="form-control">
     <label class="label">Structured Menu</label>
@@ -403,7 +444,6 @@ const handlePhotoUpload = async (event: Event) => {
     </div>
   </div>
 {/if}
-
           <!-- Add User ID Input Field -->
           <div class="form-control">
             <label for="userId" class="label">User ID</label>

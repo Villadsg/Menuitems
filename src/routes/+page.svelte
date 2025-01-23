@@ -39,13 +39,14 @@
       <div class="hero-overlay bg-black bg-opacity-50"></div>
       <div class="hero-content text-center text-neutral-content">
         <div class="max-w-md">
-          <h1 class="text-4xl font-bold mb-6">Find Menus Nearby</h1>
+          <h1 class="text-4xl font-bold mb-6"> Combine nearby restaurant menus into one</h1>
           <div class="flex flex-col space-y-4">
             <a href="/find-quiz">
-              <button class="bg-green-500 btn btn-primary w-full">Explore Menus</button>
+              <button class="bg-green-500 btn btn-primary w-full">Combined nearby Menu</button>
             </a>
+            
             <a href="/addmenu">
-              <button class="bg-green-500 btn btn-primary w-full">Add Your Menu (OCR)</button>
+              <button class="bg-green-500 btn btn-primary w-full">Add Your Menu</button>
             </a>
          
           </div>
