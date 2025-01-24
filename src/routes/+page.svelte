@@ -39,10 +39,10 @@
       <div class="hero-overlay bg-black bg-opacity-50"></div>
       <div class="hero-content text-center text-neutral-content">
         <div class="max-w-md">
-          <h1 class="text-4xl font-bold mb-6"> Combine nearby restaurant menus into one</h1>
+          <h1 class="text-4xl font-bold mb-6"> Combine nearby menus into one</h1>
           <div class="flex flex-col space-y-4">
             <a href="/find-quiz">
-              <button class="bg-green-500 btn btn-primary w-full">Combined nearby Menu</button>
+              <button class="bg-green-500 btn btn-primary w-full">See menu</button>
             </a>
             
             <a href="/addmenu">

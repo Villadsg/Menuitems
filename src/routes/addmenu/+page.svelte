@@ -1,5 +1,5 @@
 <svelte:head>
-  <script async src="https://docs.opencv.org/4.x/opencv.js" type="text/javascript"></script>
+  <!-- Remove OpenCV script -->
 </svelte:head>
 
 <script lang="ts">
@@ -20,7 +20,7 @@
   let showCoordinatesInput = false;
   let message = '';
   let languages = ['ES', 'IT', 'DA', 'JA'];
-let menuSections: MenuSection[] = [];
+  let menuSections: MenuSection[] = [];
 
   let selectedLanguage = 'EN'; // Default language is English
   const availableLanguages = [
@@ -30,14 +30,6 @@ let menuSections: MenuSection[] = [];
     { code: 'DA', name: 'Danish' },
     { code: 'JA', name: 'Japanese' }
   ];
-  
-const ocrLanguageMap: Record<string, string> = {
-  EN: 'eng', // English
-  ES: 'spa', // Spanish
-  IT: 'ita', // Italian
-  DA: 'dan', // Danish
-  JA: 'jpn', // Japanese
-};
 
   const currentDate = new Date().toISOString().slice(0, 16).replace('T', ' ');
 
@@ -53,140 +45,7 @@ const ocrLanguageMap: Record<string, string> = {
   $: userId = $user?.$id || 'anonymous';
 
   let photoPreviewUrl: string | null = null; // To store the URL of the uploaded photo
-  let extractedText: string | null = null; // To store the extracted text from OCR
-import Tesseract from 'tesseract.js';
-import cv2 from 'opencv.js';
 
- import { onMount } from 'svelte';
-
-  let cv: any;
-
-  onMount(() => {
-    // Wait for OpenCV.js to initialize
-    cv['onRuntimeInitialized'] = () => {
-      console.log('OpenCV.js is ready!');
-      // Your OpenCV code here
-    };
-  });
-  
-  
-
-function preprocessImage(imageFile: File): Promise<File> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.src = URL.createObjectURL(imageFile);
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = img.width;
-      canvas.height = img.height;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0);
-
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const mat = cv.matFromImageData(imageData);
-      const gray = new cv.Mat();
-      cv.cvtColor(mat, gray, cv.COLOR_RGBA2GRAY, 0);
-      const binary = new cv.Mat();
-      cv.threshold(gray, binary, 0, 255, cv.THRESH_BINARY | cv.THRESH_OTSU);
-
-      const processedImageData = new ImageData(
-        new Uint8ClampedArray(binary.data),
-        binary.cols,
-        binary.rows
-      );
-      ctx.putImageData(processedImageData, 0, 0);
-
-      canvas.toBlob((blob) => {
-        const processedFile = new File([blob], imageFile.name, { type: 'image/png' });
-        resolve(processedFile);
-      }, 'image/png');
-    };
-    img.onerror = reject;
-  });
-}
-
-async function extractTextWithTesseract(file: File, languageCode: string) {
-  try {
-    const { data } = await Tesseract.recognize(file, languageCode, {
-      logger: (m) => console.log(m), // Optional: Log progress
-    });
-
-    const parsedText = data.text;
-    return { parsedText };
-  } catch (error) {
-    console.error('Tesseract Error:', error);
-    return null;
-  }
-}
-
-function parseHocrOutput(hocr: string): TextOverlay {
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(hocr, 'text/html');
-  const lines: Line[] = [];
-
-  // Example: Parse hocr to extract words and their bounding boxes
-  const wordElements = doc.querySelectorAll('.ocrx_word');
-  wordElements.forEach((wordElement) => {
-    const wordText = wordElement.textContent?.trim() || '';
-    const bbox = wordElement.getAttribute('title')?.split(' '); // Extract bounding box
-    if (bbox && bbox.length >= 4) {
-      const word: Word = {
-        WordText: wordText,
-        Left: parseInt(bbox[1]),
-        Top: parseInt(bbox[2]),
-        Width: parseInt(bbox[3]) - parseInt(bbox[1]),
-        Height: parseInt(bbox[4]) - parseInt(bbox[2]),
-      };
-      // Group words into lines (you may need to implement this logic)
-      // ...
-    }
-  });
-
-  return { Lines: lines };
-}
-
-function parseMenuFromText(text: string): MenuSection[] {
-  const menuSections: MenuSection[] = [];
-  let currentSection: MenuSection | null = null;
-
-  const lines = text.split('\n');
-  for (const line of lines) {
-    // Check if the line is a section header (e.g., all caps or contains specific keywords)
-    if (isSectionHeader(line)) {
-      currentSection = {
-        name: line.trim(),
-        items: [],
-      };
-      menuSections.push(currentSection);
-    } else if (currentSection) {
-      // Group lines into menu items and prices
-      const item = parseMenuItem(line);
-      if (item) {
-        currentSection.items.push(item);
-      }
-    }
-  }
-
-  return menuSections;
-}
-
-function isSectionHeader(line: string): boolean {
-  // Example logic: Check if the line is in all caps or contains specific keywords
-  return line === line.toUpperCase() || line.includes('Menu') || line.includes('Section');
-}
-
-function parseMenuItem(line: string): { name: string; price: string } | null {
-  const priceMatch = line.match(/\$\d+(\.\d{2})?/); // Match prices like $10.00
-  if (priceMatch) {
-    const price = priceMatch[0];
-    const name = line.replace(price, '').trim();
-    return {
-      name,
-      price,
-    };
-  }
-  return null;
-}
   /** Function to extract coordinates from EXIF metadata */
   const extractPhotoCoordinates = async (file: File) => {
     try {
@@ -206,57 +65,32 @@ function parseMenuItem(line: string): { name: string; price: string } | null {
     }
   };
 
-async function handlePhotoUpload(event: Event) {
-  const input = event.target as HTMLInputElement;
-  filesMainPhoto = input.files;
+  async function handlePhotoUpload(event: Event) {
+    const input = event.target as HTMLInputElement;
+    filesMainPhoto = input.files;
 
-  if (filesMainPhoto && filesMainPhoto[0]) {
-    const originalFile = filesMainPhoto[0];
-    await extractPhotoCoordinates(originalFile);
+    if (filesMainPhoto && filesMainPhoto[0]) {
+      const originalFile = filesMainPhoto[0];
+      await extractPhotoCoordinates(originalFile);
 
-    if (showCoordinatesInput) {
-      const useLocation = confirm('Photo has no GPS data. Would you like to use your current location as the shop location?');
-      if (useLocation) {
-        await fetchCurrentLocation();
+      if (showCoordinatesInput) {
+        const useLocation = confirm('Photo has no GPS data. Would you like to use your current location as the shop location?');
+        if (useLocation) {
+          await fetchCurrentLocation();
+        }
       }
-    }
 
-    try {
-      // Preprocess the image
-      const preprocessedFile = await preprocessImage(originalFile);
-      compressedFile = await compressImage(preprocessedFile);
-
-      // Extract text using Tesseract.js with custom configuration
-      const ocrResult = await extractTextWithTesseract(compressedFile, ocrLanguageMap[selectedLanguage], {
-        tessedit_pageseg_mode: '6', // PSM_SINGLE_BLOCK
-        tessedit_ocr_engine_mode: '1', // OEM_LSTM_ONLY
-      });
-
-      if (ocrResult) {
-        const { parsedText } = ocrResult;
-
-        // Correct spelling
-        const correctedText = correctSpelling(parsedText);
-
-        // Store the parsed text (if needed)
-        extractedText = correctedText;
-
-        // Process the text to group words into logical sections
-        menuSections = parseMenuFromText(correctedText);
-
-        // Log or store the structured menu data
-        console.log('Structured Menu Data:', menuSections);
-
-        // Optionally, update your UI or state with the structured menu data
+      try {
+        // Compress the image
+        compressedFile = await compressImage(originalFile);
+      } catch (error) {
+        console.error('Failed to process the photo:', error);
+        message = 'Failed to process the photo.';
+        compressedFile = null;
       }
-    } catch (error) {
-      console.error('Failed to process the photo:', error);
-      message = 'Failed to process the photo.';
-      compressedFile = null;
     }
   }
-}
- 
+
   const uploadMainPhoto = async () => {
     try {
       if (compressedFile) {
@@ -355,13 +189,14 @@ async function handlePhotoUpload(event: Event) {
             <label for="routeName" class="label">Name of Place</label>
             <input id="routeName" type="text" bind:value={routeName} placeholder="'Best Bakery'" required class="input input-bordered w-full" />
           </div>
-           <div class="form-control">
+          <div class="form-control">
             <label for="Description" class="label">Menu page Name</label>
             <textarea id="Description" bind:value={Description} placeholder="'Drinks'" required class="textarea textarea-bordered"></textarea>
           </div>
 
           <div class="form-control">
             <label for="photo" class="label">Add Menu Photo</label>
+             
             <input
               id="photo"
               type="file"
@@ -391,7 +226,10 @@ async function handlePhotoUpload(event: Event) {
                 {/if}
               </button>
             </div>
+          {:else}
+          <p class="text-sm text-gray-600">The location of the photo will be the location of the shop</p>
           {/if}
+          
           <div class="form-control">
             <label for="language" class="label">Menu Language</label>
             <select id="language" bind:value={selectedLanguage} class="select select-bordered w-full">
@@ -400,7 +238,6 @@ async function handlePhotoUpload(event: Event) {
               {/each}
             </select>
           </div>
-         
 
           <button type="button" class="btn btn-primary w-full mt-3" on:click={goToPhotoPreview}>
             Next
@@ -414,36 +251,7 @@ async function handlePhotoUpload(event: Event) {
           {#if photoPreviewUrl}
             <img src={photoPreviewUrl} alt="Uploaded Photo" class="w-full h-auto rounded-lg shadow-md" />
           {/if}
- <!-- Display Raw OCR Output -->
-          {#if extractedText}
-            <div class="form-control">
-              <label class="label">Raw OCR Output</label>
-              <div class="p-4 bg-gray-100 rounded-lg text-left">
-                <pre class="whitespace-pre-wrap break-words">{extractedText}</pre>
-              </div>
-            </div>
-          {/if}
-          
-{#if menuSections && menuSections.length > 0}
-  <div class="form-control">
-    <label class="label">Structured Menu</label>
-    <div class="p-4 bg-gray-100 rounded-lg text-left">
-      {#each menuSections as section}
-        <div class="menu-section mb-6">
-          <h2 class="section-title font-bold text-lg mb-2">{section.name}</h2>
-          <ul class="menu-items">
-            {#each section.items as item}
-              <li class="menu-item mb-2">
-                <span class="item-name">{item.name}</span>
-                <span class="item-price font-bold ml-2">{item.price}</span>
-              </li>
-            {/each}
-          </ul>
-        </div>
-      {/each}
-    </div>
-  </div>
-{/if}
+
           <!-- Add User ID Input Field -->
           <div class="form-control">
             <label for="userId" class="label">User ID</label>
