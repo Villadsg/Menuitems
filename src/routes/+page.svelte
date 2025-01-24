@@ -65,12 +65,12 @@
         <div class="space-y-3"> <!-- Reduced space-y to 3 -->
           <div class="card bg-base-100 shadow-md">
             <div class="card-body p-4"> <!-- Reduced padding to 4 -->
-              <p>See what your closest restaurants can offer today.</p>
+              <p>See what the closest shops can offer today</p>
             </div>
           </div>
           <div class="card bg-base-100 shadow-md">
             <div class="card-body p-4">
-              <p>Discover unique dishes</p>
+              <p>Discover the menu items that makes the shop great</p>
             </div>
           </div>
           <div class="card bg-base-100 shadow-md">
@@ -87,7 +87,7 @@
         <div class="space-y-3"> <!-- Reduced space-y to 3 -->
           <div class="card bg-base-100 shadow-md">
             <div class="card-body p-4">
-              <p>Get your unique products highlighted in your area.</p>
+              <p>Get your unique products highlighted in your area and reviewed by customers</p>
             </div>
           </div>
           <div class="card bg-base-100 shadow-md">
