@@ -4,6 +4,8 @@
   import { checkUser, user } from '$lib/userStore'; // Import from auth.ts
   import { getCurrentLocation } from '$lib/location'; 
   import Map from '$lib/Map.svelte';
+  import { fade, fly } from 'svelte/transition';
+  import Card from '$lib/components/Card.svelte';
 
   // Writable store to manage the user state
   let userStatus = writable<Promise<null | object>>(null);
@@ -19,6 +21,49 @@
       console.error('Error fetching location:', err);
     }
   });
+
+  // Features section data
+  const features = [
+    {
+      icon: 'fas fa-utensils',
+      title: 'Discover Local Menus',
+      description: 'Find and browse menus from restaurants in your area, all in one convenient place.'
+    },
+    {
+      icon: 'fas fa-map-marker-alt',
+      title: 'Location-Based',
+      description: 'See menu content from restaurants near your current location and search for specific meals'
+    },
+    {
+      icon: 'fas fa-language',
+      title: 'Multi-Language Support',
+      description: 'View menus in multiple languages including English, Spanish, Italian, Danish, and Japanese.'
+    },
+    {
+      icon: 'fas fa-share-alt',
+      title: 'Share Your Menu',
+      description: 'Restaurant owners can easily add and update their menu items for customers to discover.'
+    }
+  ];
+
+  // How it works steps
+  const steps = [
+    {
+      number: '1',
+      title: 'Create an Account',
+      description: 'Sign up for free to access all features of MenuMap.'
+    },
+    {
+      number: '2',
+      title: 'Browse Nearby Menus',
+      description: 'Discover restaurants and their menu items around your location.'
+    },
+    {
+      number: '3',
+      title: 'Add Your Own Menu',
+      description: 'Restaurant owners can easily add their menu items for customers to find.'
+    }
+  ];
 </script>
 
 <!-- Home page content -->
@@ -30,8 +75,40 @@
 {:then user}
   {#if user}
     <!-- Show Map component when logged in -->
-    <div class="pt-20">
-    
+    <div class="container mx-auto px-4 py-8">
+      <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+        <h1 class="text-2xl font-bold mb-4">Welcome back!</h1>
+        <p class="text-gray-600 mb-6">Explore menus from restaurants around you or add your own menu items.</p>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <a href="/find-quiz" class="block">
+            <div class="bg-green-50 hover:bg-green-100 transition-colors p-6 rounded-lg border border-green-200 flex items-center">
+              <i class="fas fa-search text-3xl text-green-500 mr-4"></i>
+              <div>
+                <h3 class="text-xl font-semibold text-green-800">Find Menu Items</h3>
+                <p class="text-green-600">Browse and discover menu items near you</p>
+              </div>
+            </div>
+          </a>
+          
+          <a href="/create-quiz" class="block">
+            <div class="bg-blue-50 hover:bg-blue-100 transition-colors p-6 rounded-lg border border-blue-200 flex items-center">
+              <i class="fas fa-plus-circle text-3xl text-blue-500 mr-4"></i>
+              <div>
+                <h3 class="text-xl font-semibold text-blue-800">Add Menu Items</h3>
+                <p class="text-blue-600">Share your restaurant's menu with others</p>
+              </div>
+            </div>
+          </a>
+        </div>
+      </div>
+      
+      <div class="bg-white rounded-lg shadow-md p-6">
+        <h2 class="text-2xl font-bold mb-4">Nearby Restaurants</h2>
+        <div class="h-96 w-full">
+          <Map />
+        </div>
+      </div>
     </div>
   {:else}
     <!-- Hero Section -->
@@ -43,95 +120,91 @@
           <p class="text-xl mb-8">Browse and compare menu content from restaurants around you. Perfect for finding your next meal or sharing your restaurant's offerings.</p>
           <div class="flex flex-col space-y-4">
             <a href="/find-quiz">
-              <button class="bg-green-500 btn btn-primary w-full">See menu</button>
+              <button class="bg-green-500 hover:bg-green-600 transition-colors btn btn-primary w-full flex items-center justify-center">
+                <i class="fas fa-search mr-2"></i> Browse Menus
+              </button>
             </a>
             
             <a href="/addmenu">
-              <button class="bg-green-500 btn btn-primary w-full">Add Your Menu</button>
+              <button class="bg-green-500 hover:bg-green-600 transition-colors btn btn-primary w-full flex items-center justify-center">
+                <i class="fas fa-plus-circle mr-2"></i> Add Your Menu
+              </button>
             </a>
-         
+            
+            <a href="/signup">
+              <button class="bg-white text-green-600 hover:bg-green-50 transition-colors btn w-full flex items-center justify-center">
+                <i class="fas fa-user-plus mr-2"></i> Sign Up Free
+              </button>
+            </a>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Feature Description Section -->
-<div class="py-12 bg-base-200">
-  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-    <h2 class="text-3xl font-bold text-center mb-8">Why MenuMap?</h2>
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6"> <!-- Reduced gap to 6 -->
-      <!-- For Customers -->
-      <div>
-        <h3 class="text-xl font-semibold mb-4 text-center">For Customers</h3>
-        <div class="space-y-3"> <!-- Reduced space-y to 3 -->
-          <div class="card bg-base-100 shadow-md">
-            <div class="card-body p-4"> <!-- Reduced padding to 4 -->
-              <p>See what the closest shops can offer today</p>
+    <!-- Features Section -->
+    <section class="py-16 bg-white">
+      <div class="container mx-auto px-4">
+        <h2 class="text-3xl font-bold text-center mb-12">Why Choose MenuMap?</h2>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+          {#each features as feature}
+            <div in:fade={{ delay: 200, duration: 300 }} class="bg-gray-50 rounded-lg p-6 text-center hover:shadow-md transition-shadow">
+              <div class="bg-green-100 text-green-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i class="{feature.icon} text-2xl"></i>
+              </div>
+              <h3 class="text-xl font-semibold mb-2">{feature.title}</h3>
+              <p class="text-gray-600">{feature.description}</p>
             </div>
-          </div>
-          <div class="card bg-base-100 shadow-md">
-            <div class="card-body p-4">
-              <p>Discover the menu items that makes the shop great</p>
-            </div>
-          </div>
-          <div class="card bg-base-100 shadow-md">
-            <div class="card-body p-4">
-              <p>Follow other customer's opinions on their specific order</p>
-            </div>
-          </div>
+          {/each}
         </div>
       </div>
+    </section>
 
-      <!-- For Shops -->
-      <div>
-        <h3 class="text-xl font-semibold mb-4 text-center">For Shops</h3>
-        <div class="space-y-3"> <!-- Reduced space-y to 3 -->
-          <div class="card bg-base-100 shadow-md">
-            <div class="card-body p-4">
-              <p>Get your unique products highlighted in your area and reviewed by customers</p>
+    <!-- How It Works Section -->
+    <section class="py-16 bg-gray-50">
+      <div class="container mx-auto px-4">
+        <h2 class="text-3xl font-bold text-center mb-12">How It Works</h2>
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {#each steps as step, i}
+            <div in:fly={{ y: 20, delay: i * 150, duration: 300 }} class="relative">
+              <div class="bg-white rounded-lg p-8 shadow-md relative z-10 h-full">
+                <div class="bg-green-500 text-white w-12 h-12 rounded-full flex items-center justify-center text-xl font-bold mb-4">
+                  {step.number}
+                </div>
+                <h3 class="text-xl font-semibold mb-2">{step.title}</h3>
+                <p class="text-gray-600">{step.description}</p>
+              </div>
+              
+              {#if i < steps.length - 1}
+                <div class="hidden md:block absolute top-1/2 right-0 w-1/2 h-0.5 bg-green-300 z-0"></div>
+              {/if}
             </div>
-          </div>
-          <div class="card bg-base-100 shadow-md">
-            <div class="card-body p-4">
-              <p>Let MenuMap improve and translate your menu for free.</p>
-            </div>
-          </div>
-          <div class="card bg-base-100 shadow-md">
-            <div class="card-body p-4">
-              <p>Schedule permanent or temporary changes to the menu effortlessly.</p>
-            </div>
-          </div>
+          {/each}
+        </div>
+        
+        <div class="text-center mt-12">
+          <a href="/signup" class="bg-green-500 hover:bg-green-600 text-white py-3 px-8 rounded-lg inline-flex items-center transition-colors">
+            <span>Get Started Now</span>
+            <i class="fas fa-arrow-right ml-2"></i>
+          </a>
         </div>
       </div>
-    </div>
-  </div>
-</div>
-
-    <!-- Footer -->
-    <footer class="footer p-10 bg-neutral text-neutral-content">
-      <div>
-        <p class="font-bold">MenuMap™</p>
-        <p>© 2024 - All rights reserved</p>
-      </div> 
-      <div>
-        <span class="footer-title">Services</span> 
-        <a href="/find-quiz" class="link link-hover">Find the menus nearby</a>
-      </div> 
-      <div>
-        <span class="footer-title">Company</span> 
-        <a href="/about" class="link link-hover">About</a>
-        <a href="/contact" class="link link-hover">Contact</a>
+    </section>
+    <!-- CTA Section -->
+    <section class="py-16 bg-green-600 text-white">
+      <div class="container mx-auto px-4 text-center">
+        <h2 class="text-3xl font-bold mb-4">Ready to Discover Local Menus?</h2>
+        <p class="text-xl mb-8 max-w-2xl mx-auto">Join MenuMap today and start exploring restaurant menus in your area or share your own menu with the world.</p>
+        <div class="flex flex-col sm:flex-row justify-center gap-4">
+          <a href="/signup" class="bg-white text-green-600 hover:bg-gray-100 transition-colors py-3 px-8 rounded-lg font-semibold">
+            Create Free Account
+          </a>
+          <a href="/how-to" class="border border-white hover:bg-green-700 transition-colors py-3 px-8 rounded-lg font-semibold">
+            Learn More
+          </a>
+        </div>
       </div>
-    </footer>
+    </section>
   {/if}
-{:catch error}
-  <!-- Error Handling -->
-  <div class="alert alert-error shadow-lg max-w-md mx-auto mt-8">
-    <div>
-      <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current flex-shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-      <span>Error loading user status: {error.message}</span>
-    </div>
-  </div>
 {/await}

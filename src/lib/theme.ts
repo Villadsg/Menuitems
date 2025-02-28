@@ -1,0 +1,56 @@
+// Theme configuration for MenuMap
+export const theme = {
+  colors: {
+    primary: '#4CAF50', // Green
+    secondary: '#FF9800', // Orange
+    accent: '#2196F3', // Blue
+    background: '#FFFFFF',
+    text: {
+      primary: '#212121',
+      secondary: '#757575',
+      light: '#FFFFFF'
+    },
+    success: '#4CAF50',
+    error: '#F44336',
+    warning: '#FFC107',
+    info: '#2196F3'
+  },
+  typography: {
+    fontFamily: {
+      primary: '"Poppins", sans-serif',
+      secondary: '"Roboto", sans-serif'
+    },
+    fontSize: {
+      xs: '0.75rem',
+      sm: '0.875rem',
+      base: '1rem',
+      lg: '1.125rem',
+      xl: '1.25rem',
+      '2xl': '1.5rem',
+      '3xl': '1.875rem',
+      '4xl': '2.25rem',
+      '5xl': '3rem'
+    }
+  },
+  spacing: {
+    xs: '0.25rem',
+    sm: '0.5rem',
+    md: '1rem',
+    lg: '1.5rem',
+    xl: '2rem',
+    '2xl': '3rem'
+  },
+  borderRadius: {
+    sm: '0.125rem',
+    md: '0.375rem',
+    lg: '0.5rem',
+    xl: '1rem',
+    full: '9999px'
+  },
+  shadows: {
+    sm: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+    md: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+    lg: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+    xl: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+  }
+};
