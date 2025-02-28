@@ -5,6 +5,9 @@ const databaseId = '6609473fbde756e5dc45';
 const bucketId = '66efdb420000df196b64';
 
 export const AppwriteService = {
+  databaseId,
+  bucketId,
+  
   // Create a document in a specific collection
   async createDocument(collectionId, data) {
     return await databases.createDocument(databaseId, collectionId, ID.unique(), data);
