@@ -1,17 +1,35 @@
-# create-svelte
+# LangTours
 
-Everything you need to build a Svelte project, powered by [`create-svelte`](https://github.com/sveltejs/kit/tree/main/packages/create-svelte).
+A web application for uploading and managing restaurant menus with OCR capabilities.
 
-## Creating a project
+## Features
 
-If you're seeing this, you've probably already done this step. Congrats!
+- Upload restaurant menu photos
+- Automatic text extraction from menu photos using OCR
+- Location-based menu discovery
+- User authentication with Appwrite
 
-```bash
-# create a new project in the current directory
-npm create svelte@latest
+## OCR Functionality
 
-# create a new project in my-app
-npm create svelte@latest my-app
+The application uses the GOT-OCR2_0 model from Hugging Face to extract text from uploaded menu photos. When a user uploads a menu photo, the application automatically:
+
+1. Extracts text content from the menu image
+2. Structures the data into menu items with categories, names, descriptions, and prices
+3. Stores both the raw OCR text and structured data in Appwrite
+
+## Setup
+
+1. Clone the repository
+2. Install dependencies with `npm install`
+3. Create a `.env` file based on `.env.example`
+4. Add your Hugging Face API token to the `.env` file
+5. Start the development server with `npm run dev`
+
+## Environment Variables
+
+```
+# Hugging Face API token for OCR
+VITE_HUGGING_FACE_API_TOKEN=your_huggingface_token_here
 ```
 
 ## Developing

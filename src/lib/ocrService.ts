@@ -15,7 +15,7 @@ export interface MenuOCRResult {
 export class OCRService {
   // Using Hugging Face Inference API
   private static apiUrl = 'https://api-inference.huggingface.co/models/stepfun-ai/GOT-OCR2_0';
-  private static apiToken = ''; // You'll need to set this via environment variable
+  private static apiToken = import.meta.env.VITE_HUGGING_FACE_API_TOKEN || '';
   
   /**
    * Process an image with OCR to extract menu text

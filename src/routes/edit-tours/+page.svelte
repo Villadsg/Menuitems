@@ -4,14 +4,16 @@
   import { onMount } from 'svelte';
   import { Query } from 'appwrite';
   import { compressImage } from '$lib/compress'; // Import the compress function
-
-
+  import { fly, fade } from 'svelte/transition';
+  import Card from '$lib/components/Card.svelte';
+  import Loading from '$lib/components/Loading.svelte';
+  import { goto } from '$app/navigation';
 
   let deleteLoading = false; // New variable for delete loading spinner
   let loading = false;
-  let monuments = [];
+  let menus = [];
   let message = '';
-  let monumentToDelete = null;
+  let menuToDelete = null;
   let confirmationName = '';
   let errorMessage = '';
 
@@ -21,14 +23,13 @@
   $: userId = $user?.$id;
 
   let isEditing = false;
-  let editMonumentData = {
+  let editMenuData = {
     id: '',
     Route_name: '',
     lat: '',
     lng: '',
     photoFileId: '',
-    Description: '',
-    closebyDescription: ''
+    Description: ''
   };
 
   let newPhotoFile = null;
@@ -43,7 +44,6 @@
       }
     }
   }
-
 
   /** Function to translate text */
   async function translateText(text: string, targetLang: string) {
@@ -67,300 +67,373 @@
     }
   }
 
-  
+  const loadMenus = async () => {
+    if (!userId) {
+      console.error('User ID is not available yet.');
+      return; // Prevent querying if userId is not set
+    }
 
-  const loadMonuments = async () => {
-  if (!userId) {
-    console.error('User ID is not available yet.');
-    return; // Prevent querying if userId is not set
-  }
-
-  try {
-    const response = await databases.listDocuments(
-      databaseId,
-      collectionId,
-      [Query.equal('userId', userId)]
-    );
-    monuments = response.documents;
-    message = monuments.length === 0 ? 'No monument tours created yet.' : '';
-  } catch (error) {
-    console.error('Error loading monuments:', error);
-    message = 'Failed to load monuments.';
-  }
-};
-
-
-  const confirmDelete = async (monument) => {
-  if (monument && confirmationName === monument.Route_name) {
-    deleteLoading = true;
     try {
-      if (monument.photoFileId) {
-        await storage.deleteFile('66efdb420000df196b64', monument.photoFileId);
-      }
-
-      await databases.deleteDocument(databaseId, collectionId, monument.$id);
-      await loadMonuments();
-
-       // Close the modal after successful deletion
-       monumentToDelete = null;
-      confirmationName = '';  // Reset the confirmation name input
-      errorMessage = ''; 
-      
+      loading = true;
+      const response = await databases.listDocuments(
+        databaseId,
+        collectionId,
+        [Query.equal('userId', userId)]
+      );
+      menus = response.documents;
+      message = menus.length === 0 ? 'No menus uploaded yet.' : '';
     } catch (error) {
-      console.error('Error deleting monument:', error);
+      console.error('Error loading menus:', error);
+      message = 'Failed to load menus.';
     } finally {
+      loading = false;
+    }
+  };
+
+  const confirmDelete = async (menu) => {
+    if (menu && confirmationName === menu.Route_name) {
+      deleteLoading = true;
+      try {
+        if (menu.photoFileId) {
+          await storage.deleteFile('66efdb420000df196b64', menu.photoFileId);
+        }
+
+        await databases.deleteDocument(databaseId, collectionId, menu.$id);
+        await loadMenus();
+
+        // Close the modal after successful deletion
+        menuToDelete = null;
+        confirmationName = '';  // Reset the confirmation name input
+        errorMessage = ''; 
+        
+      } catch (error) {
+        console.error('Error deleting menu:', error);
+      } finally {
         deleteLoading = false; // Reset delete loading after the delete operation completes
       }
-  } else {
-    errorMessage = "The name you entered doesn't match the monument.";
-  }
-};
+    } else {
+      errorMessage = "The name you entered doesn't match the menu.";
+    }
+  };
 
-
-  const initiateDelete = (monument) => {
-    monumentToDelete = monument;
+  const initiateDelete = (menu) => {
+    menuToDelete = menu;
     confirmationName = '';
     errorMessage = '';
   };
 
-  const editMonument = (monument) => {
-  isEditing = true;
-  editMonumentData = {
-    id: monument.$id,
-    Route_name: monument.Route_name,
-    lat: monument.lat,
-    lng: monument.lng,
-    photoFileId: monument.photoFileId,
-    Description: JSON.parse(monument.Description)?.['EN'] || '', // Load English translation
-    closebyDescription: JSON.parse(monument.closebyDescription)?.['EN'] || '', // Load English 
+  const editMenu = (menu) => {
+    isEditing = true;
+    editMenuData = {
+      id: menu.$id,
+      Route_name: menu.Route_name,
+      lat: menu.lat,
+      lng: menu.lng,
+      photoFileId: menu.photoFileId,
+      Description: typeof menu.Description === 'string' && menu.Description.startsWith('{')
+        ? JSON.parse(menu.Description)?.EN || ''
+        : menu.Description || ''
+    };
   };
-};
 
-  const updateMonument = async () => {
-  try {
-    loading = true;
-    const currentDate = new Date().toISOString();
-
-    // Handle new photo upload if applicable
-    if (newPhotoFile) {
-      if (editMonumentData.photoFileId) {
-        try {
-          await storage.deleteFile('66efdb420000df196b64', editMonumentData.photoFileId);
-        } catch (error) {
-          console.error(`Error deleting old photo:`, error);
-        }
-      }
-
-      try {
-        const uploadResponse = await storage.createFile('66efdb420000df196b64', ID.unique(), newPhotoFile);
-        editMonumentData.photoFileId = uploadResponse.$id;
-      } catch (error) {
-        console.error('Error uploading new photo:', error);
-        throw new Error('Failed to upload new photo');
-      }
-
-      newPhotoFile = null;
-    }
-
-    // Parse the existing JSON for Description and closebyDescription
-    let descriptionTranslations = {};
-    let closebyDescriptionTranslations = {};
-
+  const updateMenu = async () => {
     try {
-      descriptionTranslations = JSON.parse(editMonumentData.Description);
-      closebyDescriptionTranslations = JSON.parse(editMonumentData.closebyDescription);
+      loading = true;
+      const currentDate = new Date().toISOString();
+
+      // Handle new photo upload if applicable
+      if (newPhotoFile) {
+        if (editMenuData.photoFileId) {
+          try {
+            await storage.deleteFile('66efdb420000df196b64', editMenuData.photoFileId);
+          } catch (error) {
+            console.error(`Error deleting old photo:`, error);
+          }
+        }
+
+        try {
+          const uploadResponse = await storage.createFile('66efdb420000df196b64', ID.unique(), newPhotoFile);
+          editMenuData.photoFileId = uploadResponse.$id;
+        } catch (error) {
+          console.error('Error uploading new photo:', error);
+          throw new Error('Failed to upload new photo');
+        }
+
+        newPhotoFile = null;
+      }
+
+      // Prepare the updated data
+      const updatedData = {
+        Route_name: editMenuData.Route_name,
+        lat: editMenuData.lat,
+        lng: editMenuData.lng,
+        Description: editMenuData.Description,
+        photoFileId: editMenuData.photoFileId,
+        dateModified: currentDate,
+      };
+
+      // Update the original document
+      await databases.updateDocument(databaseId, collectionId, editMenuData.id, updatedData);
+
+      isEditing = false;
+      editMenuData = {
+        id: '',
+        Route_name: '',
+        lat: '',
+        lng: '',
+        Description: '',
+        photoFileId: '',
+      };
+
+      await loadMenus();
     } catch (error) {
-      console.error('Error parsing JSON fields:', error);
+      console.error('Error updating menu:', error);
+      message = 'Failed to update menu.';
+    } finally {
+      loading = false;
     }
-
-    // Language codes for translations
-    const targetLangs = ['IT', 'ES', 'JA', 'DA'];
-
-    // Update the English ('EN') translations
-    descriptionTranslations['EN'] = editMonumentData.Description;
-    closebyDescriptionTranslations['EN'] = editMonumentData.closebyDescription;
-
-    // Translate the new English text into other languages
-    for (const lang of targetLangs) {
-      descriptionTranslations[lang] = await translateText(editMonumentData.Description, lang);
-      closebyDescriptionTranslations[lang] = await translateText(editMonumentData.closebyDescription, lang);
-    }
-
-    // Prepare the updated data
-    const updatedData = {
-      Route_name: editMonumentData.Route_name,
-      lat: editMonumentData.lat,
-      lng: editMonumentData.lng,
-      Description: JSON.stringify(descriptionTranslations), // Save updated translations as JSON string
-      closebyDescription: JSON.stringify(closebyDescriptionTranslations), // Save updated translations as JSON string
-      photoFileId: editMonumentData.photoFileId,
-      dateModified: currentDate,
-    };
-
-    // Update the original document
-    await databases.updateDocument(databaseId, collectionId, editMonumentData.id, updatedData);
-
-    isEditing = false;
-    editMonumentData = {
-      id: '',
-      Route_name: '',
-      lat: '',
-      lng: '',
-      Description: '',
-      closebyDescription: '',
-      photoFileId: '',
-    };
-
-    await loadMonuments();
-  } catch (error) {
-    console.error('Error updating monument:', error);
-    message = 'Failed to update monument.';
-  } finally {
-    loading = false;
-  }
-};
+  };
 
   const cancelEdit = () => {
     isEditing = false;
-    editMonumentData = {
+    editMenuData = {
       id: '',
       Route_name: '',
       lat: '',
       lng: '',
       Description: '',
-      photoFileId: '',
-      startingPoint: ['', ''],
-      steps_in_route: ['']
+      photoFileId: ''
     };
   };
 
   onMount(async () => {
-    await loadMonuments();
+    await loadMenus();
   });
-
-
-
 </script>
 
-<!-- Edit Monument Form -->
-<div class="pt-20 max-w-lg mx-auto">
-  <h1 class="text-3xl font-bold mb-4">My Locations</h1>
-  {#if message}
-    <div class="alert alert-error shadow-lg">
-      <div>{message}</div>
-    </div>
-  {/if}
-
-  {#if isEditing}
-    <div class="card bg-base-100 shadow-xl">
-      <div class="card-body">
-        <h2 class="card-title">Edit {editMonumentData.Route_name}</h2>
-        <form on:submit|preventDefault={updateMonument} class="form-control space-y-4">
-          
-          <div class="form-control">
-            <label class="label">
-              <span class="label-text">Tour Name</span>
-              <input type="text" bind:value={editMonumentData.Route_name} class="input input-bordered" required />
-            </label>
-          </div>
-
-          <div class="form-control">
-            <label class="label">
-              <span class="label-text">Upload New Photo</span>
-              <input type="file" accept="image/*" on:change={handleFileChange} class="input input-bordered" />
-            </label>
-          </div>
-
-          <div class="form-control">
-            <label class="label">
-              <span class="label-text">Latitude</span>
-              <input type="number" step="any" bind:value={editMonumentData.lat} class="input input-bordered" required />
-            </label>
-          </div>
-
-          <div class="form-control">
-            <label class="label">
-              <span class="label-text">Longitude</span>
-              <input type="number" step="any" bind:value={editMonumentData.lng} class="input input-bordered" required />
-            </label>
-          </div>
-
-          <div class="form-control">
-            <span class="label-text">Description</span>
-            <textarea bind:value={editMonumentData.Description} class="textarea textarea-bordered" required></textarea>
-          </div>
-          
-          <div class="form-control">
-  <span class="label-text">Closeby Description</span>
-  <textarea
-    bind:value={editMonumentData.closebyDescription}
-    class="textarea textarea-bordered"
-    required
-  ></textarea>
-</div>
-
-
-          <div class="card-actions justify-end mt-4">
-            <button type="submit" class="btn btn-primary">
-              {#if loading}
-                <span class="loading loading-spinner mr-2"></span> Updating...
-              {:else}
-                Update Route
-              {/if}
-            </button>
-            <button type="button" class="btn btn-outline" on:click={cancelEdit}>Cancel</button>
-          </div>
-        </form>
+<div class="container mx-auto px-4 py-8 pt-20">
+  <div in:fly={{ y: 20, duration: 300 }}>
+    <Card padding="p-6">
+      <div class="flex justify-between items-center mb-6">
+        <h1 class="text-3xl font-bold text-gray-800">My Uploaded Menus</h1>
+        <button 
+          class="py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+          on:click={() => goto('/create-quiz')}
+        >
+          <i class="fas fa-plus mr-2"></i> Upload New Menu
+        </button>
       </div>
-    </div>
-  {/if}
-  
-  <!-- Monument List -->
-  {#if !isEditing}
-    <ul class="mt-6 space-y-4">
-      {#each monuments as monument (monument.$id)}
-        <li class="card bg-base-100 shadow-lg">
-          <div class="card-body">
-            <h3 class="card-title">{monument.Route_name}</h3>
-            <p><strong>Description:</strong>  {JSON.parse(monument.Description)?.EN || 'No English description available'}</p>
-            <p>Date Modified: {monument.dateModified.slice(0, 16).replace('T', ' ')}</p>
-            <div class="card-actions justify-end">
-              <button class="btn btn-outline btn-error" on:click={() =>  initiateDelete(monument)}>Delete</button>
-              <button class="btn btn-outline btn-primary ml-2" on:click={() => editMonument(monument)}>Edit</button>
-            </div>
+      
+      {#if loading && !isEditing}
+        <div class="flex justify-center items-center h-64">
+          <Loading />
+        </div>
+      {:else if message && menus.length === 0}
+        <div class="bg-gray-50 rounded-lg p-8 text-center">
+          <div class="text-gray-400 mb-4">
+            <i class="fas fa-utensils text-5xl"></i>
           </div>
-        </li>
-      {/each}
-    </ul>
-  {/if}
+          <h4 class="text-lg font-medium text-gray-800 mb-2">No Menus Uploaded Yet</h4>
+          <p class="text-gray-600 mb-4">Share your restaurant menu with the world!</p>
+          <button 
+            class="py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+            on:click={() => goto('/create-quiz')}
+          >
+            Upload Your First Menu
+          </button>
+        </div>
+      {/if}
+
+      {#if isEditing}
+        <div class="bg-white rounded-lg shadow-md p-6">
+          <h2 class="text-2xl font-semibold mb-4">Edit {editMenuData.Route_name}</h2>
+          <form on:submit|preventDefault={updateMenu} class="space-y-6">
+            
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Restaurant Name</label>
+              <input 
+                type="text" 
+                bind:value={editMenuData.Route_name} 
+                class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" 
+                required 
+              />
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Upload New Photo</label>
+              <input 
+                type="file" 
+                accept="image/*" 
+                on:change={handleFileChange} 
+                class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" 
+              />
+              {#if editMenuData.photoFileId}
+                <div class="mt-2">
+                  <p class="text-sm text-gray-500">Current photo:</p>
+                  <img 
+                    src={storage.getFilePreview('66efdb420000df196b64', editMenuData.photoFileId, 200)} 
+                    alt="Current menu photo" 
+                    class="mt-1 h-32 object-cover rounded-md" 
+                  />
+                </div>
+              {/if}
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Latitude</label>
+                <input 
+                  type="number" 
+                  step="any" 
+                  bind:value={editMenuData.lat} 
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" 
+                  required 
+                />
+              </div>
+
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Longitude</label>
+                <input 
+                  type="number" 
+                  step="any" 
+                  bind:value={editMenuData.lng} 
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" 
+                  required 
+                />
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Menu Description</label>
+              <textarea 
+                bind:value={editMenuData.Description} 
+                rows="5"
+                class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" 
+                required
+              ></textarea>
+            </div>
+
+            <div class="flex justify-end space-x-3">
+              <button 
+                type="button" 
+                class="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                on:click={cancelEdit}
+              >
+                Cancel
+              </button>
+              <button 
+                type="submit" 
+                class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                disabled={loading}
+              >
+                {#if loading}
+                  <span class="inline-block animate-spin mr-2">⟳</span> Updating...
+                {:else}
+                  Update Menu
+                {/if}
+              </button>
+            </div>
+          </form>
+        </div>
+      {/if}
+      
+      <!-- Menu List -->
+      {#if !isEditing && menus.length > 0}
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+          {#each menus as menu (menu.$id)}
+            <div class="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow">
+              <div class="h-48 overflow-hidden">
+                <img 
+                  src={storage.getFilePreview('66efdb420000df196b64', menu.photoFileId, 400)} 
+                  alt={menu.Route_name} 
+                  class="w-full h-full object-cover"
+                  onerror="this.src='/placeholder-menu.jpg'"
+                />
+              </div>
+              <div class="p-4">
+                <h3 class="text-xl font-semibold text-gray-800">{menu.Route_name}</h3>
+                <p class="text-gray-600 text-sm mt-2 line-clamp-2">
+                  {typeof menu.Description === 'string' && menu.Description.startsWith('{') 
+                    ? JSON.parse(menu.Description)?.EN || 'No description available'
+                    : menu.Description || 'No description available'}
+                </p>
+                <p class="text-gray-500 text-xs mt-2">
+                  Last updated: {new Date(menu.dateModified).toLocaleDateString()}
+                </p>
+                <div class="mt-4 flex justify-end space-x-2">
+                  <button 
+                    class="px-3 py-1 bg-red-100 text-red-700 rounded-md hover:bg-red-200 transition-colors text-sm"
+                    on:click={() => initiateDelete(menu)}
+                  >
+                    Delete
+                  </button>
+                  <button 
+                    class="px-3 py-1 bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-colors text-sm"
+                    on:click={() => editMenu(menu)}
+                  >
+                    Edit
+                  </button>
+                </div>
+              </div>
+            </div>
+          {/each}
+        </div>
+      {/if}
+    </Card>
+  </div>
 </div>
 
 <!-- Delete Confirmation Modal -->
-{#if monumentToDelete}
-  <div class="modal modal-open">
-    <div class="modal-box">
-      <h3 class="font-bold text-lg">Confirm Delete</h3>
-      <p>Are you sure you want to delete {monumentToDelete.Route_name}?</p>
-      <p>Enter the name <strong>{monumentToDelete.Route_name}</strong> to confirm:</p>
-      <input
-        type="text"
-        bind:value={confirmationName}
-        placeholder="Enter name to confirm"
-        class="input input-bordered w-full mt-2"
-      />
-      {#if errorMessage}
-        <p class="text-red-500 mt-2">{errorMessage}</p>
-      {/if}
-      <div class="modal-action">
-        <button class="btn btn-error" on:click={() => confirmDelete(monumentToDelete)} disabled={deleteLoading}>
+{#if menuToDelete}
+  <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg max-w-md w-full p-6">
+      <h3 class="text-xl font-bold text-gray-800 mb-4">Confirm Delete</h3>
+      <p class="text-gray-600 mb-2">Are you sure you want to delete <span class="font-semibold">{menuToDelete.Route_name}</span>?</p>
+      <p class="text-gray-600 mb-4">This action cannot be undone.</p>
+      
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700 mb-1">
+          Enter the name <span class="font-semibold">{menuToDelete.Route_name}</span> to confirm:
+        </label>
+        <input
+          type="text"
+          bind:value={confirmationName}
+          placeholder="Enter name to confirm"
+          class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+        />
+        {#if errorMessage}
+          <p class="text-red-500 text-sm mt-1">{errorMessage}</p>
+        {/if}
+      </div>
+      
+      <div class="flex justify-end space-x-3">
+        <button 
+          class="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          on:click={() => menuToDelete = null}
+        >
+          Cancel
+        </button>
+        <button 
+          class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+          on:click={() => confirmDelete(menuToDelete)} 
+          disabled={deleteLoading}
+        >
           {#if deleteLoading}
-            <span class="loading loading-spinner mr-2"></span> Deleting...
+            <span class="inline-block animate-spin mr-2">⟳</span> Deleting...
           {:else}
             Delete
           {/if}
         </button>
-        <button class="btn" on:click={() => monumentToDelete = null}>Cancel</button>
       </div>
     </div>
   </div>
 {/if}
+
+<style>
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+</style>

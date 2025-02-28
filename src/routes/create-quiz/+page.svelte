@@ -11,6 +11,7 @@
   import Loading from '$lib/components/Loading.svelte';
   import Card from '$lib/components/Card.svelte';
   import Input from '$lib/components/Input.svelte';
+  import { OCRService } from '$lib/ocrService'; // Import OCR service
  
   let routeName = '';
   let Description = '';
@@ -20,12 +21,13 @@
   let showCoordinatesInput = false; 
   let message = '';
   let languages = ['ES','IT','DA','JA']; 
-  let closebyDescription = '';
   const currentDate = new Date().toISOString().slice(0, 16).replace('T', ' ');
 
   let filesMainPhoto: FileList | null = null;
   let compressedFile: File | null = null;
   let photoPreviewUrl: string | null = null;
+  let ocrProcessing = false;
+  let ocrData = null;
 
   let loading = false;
   let uploadProgress = 0;
@@ -76,10 +78,55 @@
         // Compress the image
         compressedFile = await compressImage(filesMainPhoto[0], 0.7);
         console.log('Compressed file size:', compressedFile.size);
+        
+        // Process the image with OCR
+        await processImageWithOCR();
       } catch (error) {
         console.error('Error processing photo:', error);
         toasts.error('Error processing photo: ' + error.message);
       }
+    }
+  };
+
+  /** Process the uploaded image with OCR */
+  const processImageWithOCR = async () => {
+    if (!compressedFile && !filesMainPhoto?.[0]) {
+      return;
+    }
+    
+    try {
+      ocrProcessing = true;
+      
+      // Upload the file temporarily to get a file ID
+      const fileToUpload = compressedFile || filesMainPhoto?.[0];
+      const fileId = ID.unique();
+      
+      const uploadResponse = await storage.createFile(
+        bucketId,
+        fileId,
+        fileToUpload,
+        [
+          Permission.read(Role.any()),
+          Permission.update(Role.user(userId)),
+          Permission.delete(Role.user(userId))
+        ]
+      );
+      
+      // Process the image with OCR
+      const ocrResult = await OCRService.processMenuImage(fileId, bucketId);
+      ocrData = ocrResult;
+      
+      // If we have OCR data, populate the description field
+      if (ocrResult && ocrResult.rawText) {
+        Description = ocrResult.rawText.substring(0, 500); // Limit to 500 chars
+        toasts.success('Menu text extracted successfully!');
+      }
+      
+    } catch (error) {
+      console.error('OCR processing error:', error);
+      toasts.error('Error extracting menu text: ' + error.message);
+    } finally {
+      ocrProcessing = false;
     }
   };
 
@@ -138,20 +185,26 @@
       }
       
       // Create the document in the database
+      const documentData = {
+        userId: userId,
+        Route_name: routeName,
+        Description: Description,
+        lat: parseFloat(lat),
+        lng: parseFloat(lng),
+        dateModified: currentDate,
+        photoFileId: mainPhotoFileId
+      };
+      
+      // Add OCR data if available
+      if (ocrData) {
+        documentData.ocrdata = JSON.stringify(ocrData);
+      }
+      
       const response = await databases.createDocument(
         AppwriteService.databaseId,
         collectionId,
         ID.unique(),
-        {
-          user_id: userId,
-          name: routeName,
-          description: Description,
-          closebyDescription: closebyDescription,
-          latitude: parseFloat(lat),
-          longitude: parseFloat(lng),
-          date_created: currentDate,
-          photo_id: mainPhotoFileId
-        },
+        documentData,
         [
           Permission.read(Role.any()),
           Permission.update(Role.user(userId)),
@@ -198,7 +251,7 @@
       <div in:fly={{ y: 20, duration: 300 }} class="max-w-2xl mx-auto">
         <Card padding="p-8">
           <div class="mb-6">
-            <h1 class="text-3xl font-bold text-gray-800 mb-2">Add Menu Items</h1>
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">Add Restaurant Menu</h1>
             <p class="text-gray-600">Upload your menu photo and we'll extract the content using OCR technology.</p>
           </div>
           
@@ -219,38 +272,26 @@
               <label class="block text-sm font-medium text-gray-700 mb-1">Menu Photo</label>
               <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:bg-gray-50 transition-colors">
                 <input 
-                  id="photo" 
+                  id="mainPhoto" 
                   type="file" 
-                  bind:files={filesMainPhoto} 
                   accept="image/*" 
-                  required 
-                  class="hidden" 
+                  bind:files={filesMainPhoto} 
                   on:change={handlePhotoUpload}
+                  class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
                 />
+                <p class="text-xs text-gray-500 mt-1">Upload a clear photo of the menu.</p>
+                
+                {#if ocrProcessing}
+                  <div class="mt-3">
+                    <Loading size="sm" />
+                    <p class="text-sm text-gray-600 mt-1">Extracting menu text with OCR...</p>
+                  </div>
+                {/if}
                 
                 {#if photoPreviewUrl}
-                  <div class="mb-4">
-                    <img src={photoPreviewUrl} alt="Menu preview" class="max-h-64 mx-auto rounded-lg shadow-md" />
-                    <button 
-                      type="button" 
-                      class="mt-2 text-sm text-red-600 hover:text-red-800"
-                      on:click={() => {
-                        photoPreviewUrl = null;
-                        filesMainPhoto = null;
-                        compressedFile = null;
-                      }}
-                    >
-                      <i class="fas fa-trash mr-1"></i> Remove photo
-                    </button>
+                  <div class="mt-3">
+                    <img src={photoPreviewUrl} alt="Menu preview" class="max-w-full h-auto rounded-md shadow-sm" />
                   </div>
-                {:else}
-                  <label for="photo" class="cursor-pointer">
-                    <div class="text-center">
-                      <i class="fas fa-cloud-upload-alt text-4xl text-gray-400 mb-2"></i>
-                      <p class="text-gray-700">Drag and drop your menu photo here or</p>
-                      <p class="text-green-600 font-medium">Browse files</p>
-                    </div>
-                  </label>
                 {/if}
               </div>
               
@@ -313,21 +354,13 @@
               <textarea 
                 id="Description" 
                 bind:value={Description} 
-                placeholder="Describe the menu and any special offerings" 
-                required 
-                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 h-24"
+                rows="5" 
+                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                placeholder="Enter menu description or let OCR extract it automatically"
               ></textarea>
-            </div>
-            
-            <div>
-              <label for="closebyDescription" class="block text-sm font-medium text-gray-700 mb-1">Special Offers (Only Visible Nearby)</label>
-              <textarea 
-                id="closebyDescription" 
-                bind:value={closebyDescription} 
-                placeholder="Enter special offers or promotions only visible to nearby users" 
-                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 h-24"
-              ></textarea>
-              <p class="text-xs text-gray-500 mt-1">This information will only be visible to users who are physically near your restaurant.</p>
+              {#if ocrData}
+                <p class="text-xs text-green-600 mt-1"> Menu text extracted with OCR</p>
+              {/if}
             </div>
             
             <button 
