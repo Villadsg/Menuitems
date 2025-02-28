@@ -39,7 +39,8 @@
       <div class="hero-overlay bg-black bg-opacity-50"></div>
       <div class="hero-content text-center text-neutral-content">
         <div class="max-w-md">
-          <h1 class="text-4xl font-bold mb-6"> Combine nearby menus into one</h1>
+          <h1 class="text-5xl font-bold mb-4">Discover Local Menus in One Place</h1>
+          <p class="text-xl mb-8">Browse and compare menu content from restaurants around you. Perfect for finding your next meal or sharing your restaurant's offerings.</p>
           <div class="flex flex-col space-y-4">
             <a href="/find-quiz">
               <button class="bg-green-500 btn btn-primary w-full">See menu</button>

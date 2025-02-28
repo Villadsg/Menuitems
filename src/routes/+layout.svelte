@@ -41,8 +41,8 @@
       </button>
       <ul class="menu menu-compact dropdown-content mt-3 p-2 shadow bg-base-200 rounded-box w-56">
         {#if $user}
-          <li><a href="/create-quiz">Create Quiz</a></li>
-          <li><a href="/find-quiz">Find Quiz</a></li>
+          <li><a href="/create-quiz">Add menu items</a></li>
+          <li><a href="/find-quiz">Find menu items</a></li>
           <li><a href="/profile">Profile</a></li>
           <li><button on:click={logout} style="cursor: pointer;">Logout</button></li>
         {:else}
