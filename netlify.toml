@@ -10,3 +10,14 @@
   from = "/api/*"
   to = "/.netlify/functions/:splat"
   status = 200
+
+[dev]
+  command = "npm run dev"
+  port = 8888
+  targetPort = 5173
+  framework = "#custom"
+
+# Replace this with your new valid token
+[dev.environment]
+  HUGGING_FACE_API_TOKEN = "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"
+  VITE_HUGGING_FACE_API_TOKEN = "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"

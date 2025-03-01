@@ -10,11 +10,12 @@ export interface MenuOCRResult {
     category?: string;
   }[];
   rawText: string;
+  debug?: any;
 }
 
 export class OCRService {
-  // Using Hugging Face Inference API
-  private static apiUrl = 'https://api-inference.huggingface.co/models/stepfun-ai/GOT-OCR2_0';
+  // Using Netlify serverless functions instead of direct API calls
+  private static huggingFaceUrl = '/.netlify/functions/ocr';
   private static apiToken = import.meta.env.VITE_HUGGING_FACE_API_TOKEN || '';
   
   /**
@@ -23,41 +24,134 @@ export class OCRService {
    * @param bucketId The Appwrite storage bucket ID
    * @returns Processed menu text data
    */
-  static async processMenuImage(imageFileId: string, bucketId: string): Promise<MenuOCRResult> {
+  static async processMenuImage(imageFileId: string, bucketId: string, options = {}): Promise<MenuOCRResult> {
     try {
       // Get the file URL from Appwrite
       const fileUrl = storage.getFileView(bucketId, imageFileId);
+      console.log('File URL:', fileUrl);
       
-      // Call Hugging Face Inference API
-      const response = await fetch(this.apiUrl, {
+      // Use Hugging Face OCR service
+      const serverlessUrl = this.huggingFaceUrl;
+      
+      // Call our serverless function instead of the API directly
+      console.log('Calling Hugging Face serverless function...');
+      const response = await fetch(serverlessUrl, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${this.apiToken}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ 
-          inputs: {
-            image: fileUrl
-          }
+          imageUrl: fileUrl
         }),
       });
       
+      console.log('Response status:', response.status);
+      
       if (!response.ok) {
-        throw new Error(`OCR API error: ${response.statusText}`);
+        let errorData;
+        try {
+          // Try to parse the error response as JSON
+          errorData = await response.json();
+          console.error('OCR API error:', errorData);
+        } catch (parseError) {
+          // If the response is not valid JSON, get the text instead
+          const errorText = await response.text();
+          console.error('OCR API error (non-JSON):', errorText);
+          
+          // Create a structured error object from the text
+          errorData = {
+            error: 'Failed to parse error response',
+            message: errorText.substring(0, 100) // Only include the first 100 chars to avoid huge errors
+          };
+        }
+        
+        // Throw a more descriptive error
+        const errorMessage = errorData.error || response.statusText;
+        throw new Error(`OCR API error: ${errorMessage}`);
       }
       
-      const ocrResult = await response.json();
+      const data = await response.json();
+      console.log('OCR API response:', data);
       
-      // Process the raw OCR text into structured menu items
-      const menuItems = this.processMenuText(ocrResult[0].generated_text);
+      // Handle the new response format with debug info
+      let ocrResult: MenuOCRResult;
       
-      return {
-        menuItems,
-        rawText: ocrResult[0].generated_text
-      };
+      if (data.result && Array.isArray(data.result) && data.result[0] && data.result[0].generated_text) {
+        const rawText = data.result[0].generated_text;
+        
+        // Use the pre-processed menu items from the serverless function if available
+        // Otherwise fall back to client-side processing
+        const menuItems = data.menuItems || this.processMenuText(rawText);
+        
+        console.log('Menu items extracted:', menuItems.length);
+        
+        // Log quality metrics from Hugging Face models
+        if (data.debug) {
+          const debug = data.debug;
+          
+          if (debug.bestModel) {
+            console.log('Best OCR result from model:', debug.bestModel);
+            console.log('OCR quality metrics:', {
+              menuScore: debug.menuScore,
+              menuKeywords: debug.menuKeywords,
+              textLength: debug.textLength,
+              extractedItems: debug.extractedItems
+            });
+          }
+        }
+        
+        ocrResult = {
+          rawText,
+          menuItems,
+          debug: data.debug || {}
+        };
+      } else if (data.text && data.usedFallback) {
+        // Handle fallback model response format
+        console.log('Processing text from fallback OCR model');
+        const rawText = data.text;
+        const menuItems = this.processMenuText(rawText);
+        
+        ocrResult = {
+          rawText,
+          menuItems,
+          debug: { usedFallback: true, modelResponses: data.modelResponses }
+        };
+      } else {
+        // Fallback for unexpected response format
+        console.warn('Unexpected OCR response format:', data);
+        ocrResult = {
+          rawText: JSON.stringify(data),
+          menuItems: [],
+          debug: data.debug || {}
+        };
+      }
+      
+      console.log('Processed OCR result:', ocrResult);
+      return ocrResult;
     } catch (error) {
       console.error('OCR processing error:', error);
-      throw error;
+      
+      // Create a more user-friendly error message
+      let userMessage = 'Failed to process menu image';
+      
+      if (error.message.includes('timeout') || error.message.includes('timed out')) {
+        userMessage = 'The OCR processing timed out. Please try again with a clearer image or try later.';
+      } else if (error.message.includes('rate limit')) {
+        userMessage = 'OCR service rate limit exceeded. Please try again in a few minutes.';
+      } else if (error.message.includes('Failed to parse error response')) {
+        userMessage = 'The OCR service is currently experiencing issues. Please try again later.';
+      } else if (error.message.includes('service is temporarily unavailable') || 
+                 error.message.includes('status code 503') || 
+                 error.message.includes('unavailable')) {
+        userMessage = 'The Hugging Face OCR service is temporarily unavailable. Please try again later.';
+      }
+      
+      // Create a structured error with additional context
+      const enhancedError = new Error(userMessage);
+      enhancedError.cause = error;
+      enhancedError.originalMessage = error.message;
+      
+      throw enhancedError;
     }
   }
   

@@ -28,6 +28,11 @@
   let photoPreviewUrl: string | null = null;
   let ocrProcessing = false;
   let ocrData = null;
+  let ocrResult = null;
+  let ocrError = null;
+  let isProcessing = false;
+  let debugInfo = null;
+  // OCR processing variables
 
   let loading = false;
   let uploadProgress = 0;
@@ -96,6 +101,10 @@
     
     try {
       ocrProcessing = true;
+      isProcessing = true;
+      ocrError = null;
+      ocrResult = null;
+      debugInfo = null;
       
       // Upload the file temporarily to get a file ID
       const fileToUpload = compressedFile || filesMainPhoto?.[0];
@@ -113,20 +122,68 @@
       );
       
       // Process the image with OCR
-      const ocrResult = await OCRService.processMenuImage(fileId, bucketId);
-      ocrData = ocrResult;
+      const ocrResultResponse = await OCRService.processMenuImage(fileId, bucketId);
+      ocrResult = ocrResultResponse;
+      debugInfo = ocrResultResponse.debug;
       
       // If we have OCR data, populate the description field
-      if (ocrResult && ocrResult.rawText) {
-        Description = ocrResult.rawText.substring(0, 500); // Limit to 500 chars
-        toasts.success('Menu text extracted successfully!');
+      if (ocrResultResponse && ocrResultResponse.rawText) {
+        Description = ocrResultResponse.rawText.substring(0, 500); // Limit to 500 chars
+        
+        // Show which model was used and quality metrics
+        if (ocrResultResponse.debug) {
+          const debug = ocrResultResponse.debug;
+          
+          if (debug.bestModel) {
+            // Hugging Face model
+            const modelName = debug.bestModel.split('/').pop(); // Get just the model name without org
+            const qualityIndicator = debug.menuScore > 8 ? 'excellent' : 
+                                    debug.menuScore > 5 ? 'good' : 
+                                    debug.menuScore > 3 ? 'fair' : 'basic';
+            
+            toasts.success(
+              `Menu text extracted successfully using ${modelName} model! ` +
+              `(${qualityIndicator} quality, ${debug.extractedItems} items found)`
+            );
+            
+            // Log additional details for debugging
+            console.log('Hugging Face Quality Metrics:', {
+              model: debug.bestModel,
+              score: debug.menuScore,
+              keywords: debug.menuKeywords,
+              textLength: debug.textLength,
+              extractedItems: debug.extractedItems
+            });
+          } else {
+            toasts.success('Menu text extracted successfully!');
+          }
+        } else {
+          toasts.success('Menu text extracted successfully!');
+        }
       }
       
     } catch (error) {
       console.error('OCR processing error:', error);
-      toasts.error('Error extracting menu text: ' + error.message);
+      
+      // Display a user-friendly error message
+      let errorMessage = error.message || 'Unknown error occurred';
+      
+      // Add retry suggestion for specific errors
+      if (errorMessage.includes('timed out') || errorMessage.includes('timeout')) {
+        errorMessage += ' Please try again with a clearer image or smaller file size.';
+      }
+      
+      toasts.error('Error extracting menu text: ' + errorMessage);
+      ocrError = errorMessage;
+      
+      // If we have a partial result, still try to use it
+      if (ocrResult && ocrResult.rawText && ocrResult.rawText.length > 20) {
+        Description = ocrResult.rawText.substring(0, 500);
+        toasts.info('Partial text was extracted. You may need to edit it manually.');
+      }
     } finally {
       ocrProcessing = false;
+      isProcessing = false;
     }
   };
 
@@ -292,6 +349,20 @@
                   <div class="mt-3">
                     <img src={photoPreviewUrl} alt="Menu preview" class="max-w-full h-auto rounded-md shadow-sm" />
                   </div>
+                  
+                  <!-- OCR Button -->
+                  <button 
+                    on:click={processImageWithOCR} 
+                    class="mt-3 w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition duration-200 flex items-center justify-center"
+                    disabled={ocrProcessing}
+                  >
+                    {#if ocrProcessing}
+                      <Loading size="sm" color="white" />
+                      <span class="ml-2">Processing with Hugging Face OCR...</span>
+                    {:else}
+                      Extract Menu Text
+                    {/if}
+                  </button>
                 {/if}
               </div>
               
@@ -363,6 +434,69 @@
               {/if}
             </div>
             
+            {#if ocrResult}
+              <div class="ocr-results">
+                <h3>OCR Results</h3>
+                <div class="raw-text">
+                  <h4>Raw Text:</h4>
+                  <pre>{ocrResult.rawText}</pre>
+                </div>
+                
+                {#if ocrResult.menuItems && ocrResult.menuItems.length > 0}
+                  <div class="menu-items">
+                    <h4>Menu Items:</h4>
+                    <ul>
+                      {#each ocrResult.menuItems as item}
+                        <li>
+                          {#if item.category && !item.name}
+                            <strong>{item.category}</strong>
+                          {:else}
+                            {#if item.name}<span class="item-name">{item.name}</span>{/if}
+                            {#if item.price}<span class="item-price">{item.price}</span>{/if}
+                            {#if item.description}<span class="item-desc">{item.description}</span>{/if}
+                            {#if !item.name && !item.price && !item.description}
+                              <span>{JSON.stringify(item)}</span>
+                            {/if}
+                          {/if}
+                        </li>
+                      {/each}
+                    </ul>
+                  </div>
+                {/if}
+                
+                {#if debugInfo}
+                  <div class="debug-info">
+                    <h4>Debug Information:</h4>
+                    <details>
+                      <summary>Click to expand debug details</summary>
+                      <div class="debug-content">
+                        <h5>Best Model: {debugInfo.bestModel || 'Unknown'}</h5>
+                        
+                        {#if debugInfo.modelResponses}
+                          <h5>Model Responses:</h5>
+                          {#each Object.entries(debugInfo.modelResponses) as [model, response]}
+                            <div class="model-response">
+                              <h6>{model}</h6>
+                              {#if response.error}
+                                <p class="error">Error: {response.error}</p>
+                              {:else}
+                                <p>Status: {response.status}</p>
+                                <p>Text length: {response.text ? response.text.length : 0} characters</p>
+                                <details>
+                                  <summary>View text</summary>
+                                  <pre>{response.text || 'No text'}</pre>
+                                </details>
+                              {/if}
+                            </div>
+                          {/each}
+                        {/if}
+                      </div>
+                    </details>
+                  </div>
+                {/if}
+              </div>
+            {/if}
+            
             <button 
               type="button" 
               class="w-full flex items-center justify-center py-3 px-4 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
@@ -401,3 +535,28 @@
     {/if}
   {/key}
 </div>
+
+<style>
+  .debug-info {
+    margin-top: 20px;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    background-color: #f9f9f9;
+  }
+  
+  .debug-content {
+    padding: 10px;
+  }
+  
+  .model-response {
+    margin-bottom: 15px;
+    padding: 10px;
+    border: 1px solid #eee;
+    border-radius: 4px;
+  }
+  
+  .error {
+    color: #d32f2f;
+  }
+</style>
