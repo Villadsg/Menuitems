@@ -26,13 +26,8 @@
   const features = [
     {
       icon: 'fas fa-utensils',
-      title: 'Discover Local Menus',
-      description: 'Find and browse menus from restaurants in your area, all in one convenient place.'
-    },
-    {
-      icon: 'fas fa-map-marker-alt',
-      title: 'Location-Based',
-      description: 'See menu content from restaurants near your current location and search for specific meals'
+      title: 'Local Menus',
+      description: 'Find and browse menu content from restaurants in your area'
     },
     {
       icon: 'fas fa-language',
@@ -42,7 +37,7 @@
     {
       icon: 'fas fa-share-alt',
       title: 'Share Your Menu',
-      description: 'Restaurant owners can easily add and update their menu items for customers to discover.'
+      description: 'Restaurant owners can add and update their menu content for customers to discover.'
     }
   ];
 
@@ -56,7 +51,7 @@
     {
       number: '2',
       title: 'Browse Nearby Menus',
-      description: 'Discover restaurants and their menu items around your location.'
+      description: 'Discover places and their menu items around your location.'
     },
     {
       number: '3',
@@ -116,8 +111,8 @@
       <div class="hero-overlay bg-black bg-opacity-50"></div>
       <div class="hero-content text-center text-neutral-content">
         <div class="max-w-md">
-          <h1 class="text-5xl font-bold mb-4">Discover Local Menus in One Place</h1>
-          <p class="text-xl mb-8">Browse and compare menu content from restaurants around you. Perfect for finding your next meal or sharing your restaurant's offerings.</p>
+          <h1 class="text-5xl font-bold mb-4">Discover Menu Content</h1>
+          <p class="text-xl mb-8">Browse and compare menu content from places around you</p>
           <div class="flex flex-col space-y-4">
             <a href="/find-quiz">
               <button class="bg-green-500 hover:bg-green-600 transition-colors btn btn-primary w-full flex items-center justify-center">
@@ -191,20 +186,6 @@
         </div>
       </div>
     </section>
-    <!-- CTA Section -->
-    <section class="py-16 bg-green-600 text-white">
-      <div class="container mx-auto px-4 text-center">
-        <h2 class="text-3xl font-bold mb-4">Ready to Discover Local Menus?</h2>
-        <p class="text-xl mb-8 max-w-2xl mx-auto">Join MenuMap today and start exploring restaurant menus in your area or share your own menu with the world.</p>
-        <div class="flex flex-col sm:flex-row justify-center gap-4">
-          <a href="/signup" class="bg-white text-green-600 hover:bg-gray-100 transition-colors py-3 px-8 rounded-lg font-semibold">
-            Create Free Account
-          </a>
-          <a href="/how-to" class="border border-white hover:bg-green-700 transition-colors py-3 px-8 rounded-lg font-semibold">
-            Learn More
-          </a>
-        </div>
-      </div>
-    </section>
+  
   {/if}
 {/await}

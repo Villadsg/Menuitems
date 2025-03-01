@@ -32,7 +32,7 @@
   let ocrError = null;
   let isProcessing = false;
   let debugInfo = null;
-  // OCR processing variables
+  let useLayoutLM = false; // Toggle for LayoutLMv3
 
   let loading = false;
   let uploadProgress = 0;
@@ -122,7 +122,7 @@
       );
       
       // Process the image with OCR
-      const ocrResultResponse = await OCRService.processMenuImage(fileId, bucketId);
+      const ocrResultResponse = await OCRService.processMenuImage(fileId, bucketId, { useLayoutLM });
       ocrResult = ocrResultResponse;
       debugInfo = ocrResultResponse.debug;
       
@@ -135,24 +135,26 @@
           const debug = ocrResultResponse.debug;
           
           if (debug.bestModel) {
-            // Hugging Face model
+            // Get model info
             const modelName = debug.bestModel.split('/').pop(); // Get just the model name without org
+            const isLayoutLM = debug.bestModel.includes('layoutlm');
             const qualityIndicator = debug.menuScore > 8 ? 'excellent' : 
                                     debug.menuScore > 5 ? 'good' : 
                                     debug.menuScore > 3 ? 'fair' : 'basic';
             
             toasts.success(
-              `Menu text extracted successfully using ${modelName} model! ` +
+              `Menu text extracted successfully using ${isLayoutLM ? 'LayoutLMv3' : modelName} model! ` +
               `(${qualityIndicator} quality, ${debug.extractedItems} items found)`
             );
             
             // Log additional details for debugging
-            console.log('Hugging Face Quality Metrics:', {
+            console.log(`${isLayoutLM ? 'LayoutLMv3' : 'Hugging Face'} Quality Metrics:`, {
               model: debug.bestModel,
               score: debug.menuScore,
-              keywords: debug.menuKeywords,
+              processingTimeMs: debug.processingTimeMs || 'N/A',
               textLength: debug.textLength,
-              extractedItems: debug.extractedItems
+              extractedItems: debug.extractedItems,
+              ...(debug.menuKeywords ? { keywords: debug.menuKeywords } : {})
             });
           } else {
             toasts.success('Menu text extracted successfully!');
@@ -350,6 +352,25 @@
                     <img src={photoPreviewUrl} alt="Menu preview" class="max-w-full h-auto rounded-md shadow-sm" />
                   </div>
                   
+                  <!-- OCR Options -->
+                  <div class="mt-4 flex items-center">
+                    <input 
+                      type="checkbox" 
+                      id="useLayoutLM" 
+                      bind:checked={useLayoutLM} 
+                      class="form-checkbox h-5 w-5 text-blue-600 rounded focus:ring-blue-500"
+                    />
+                    <label for="useLayoutLM" class="ml-2 block text-sm text-gray-700">
+                      Use LayoutLMv3 (better for complex menu layouts)
+                    </label>
+                    <div class="ml-2 group relative">
+                      <span class="text-gray-500 cursor-help">ⓘ</span>
+                      <div class="absolute bottom-full mb-2 left-0 transform -translate-x-1/2 hidden group-hover:block bg-gray-800 text-white text-xs rounded p-2 w-64 shadow-lg">
+                        LayoutLMv3 is a document AI model that understands both text content and layout structure, providing better results for complex menus.
+                      </div>
+                    </div>
+                  </div>
+                  
                   <!-- OCR Button -->
                   <button 
                     on:click={processImageWithOCR} 
@@ -358,7 +379,7 @@
                   >
                     {#if ocrProcessing}
                       <Loading size="sm" color="white" />
-                      <span class="ml-2">Processing with Hugging Face OCR...</span>
+                      <span class="ml-2">Processing with {useLayoutLM ? 'LayoutLMv3' : 'Hugging Face OCR'}...</span>
                     {:else}
                       Extract Menu Text
                     {/if}

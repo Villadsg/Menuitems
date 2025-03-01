@@ -16,6 +16,7 @@ export interface MenuOCRResult {
 export class OCRService {
   // Using Netlify serverless functions instead of direct API calls
   private static huggingFaceUrl = '/.netlify/functions/ocr';
+  private static layoutLMUrl = '/.netlify/functions/layoutlm-ocr';
   private static apiToken = import.meta.env.VITE_HUGGING_FACE_API_TOKEN || '';
   
   /**
@@ -24,17 +25,18 @@ export class OCRService {
    * @param bucketId The Appwrite storage bucket ID
    * @returns Processed menu text data
    */
-  static async processMenuImage(imageFileId: string, bucketId: string, options = {}): Promise<MenuOCRResult> {
+  static async processMenuImage(imageFileId: string, bucketId: string, options: { useLayoutLM?: boolean } = {}): Promise<MenuOCRResult> {
     try {
       // Get the file URL from Appwrite
       const fileUrl = storage.getFileView(bucketId, imageFileId);
       console.log('File URL:', fileUrl);
       
-      // Use Hugging Face OCR service
-      const serverlessUrl = this.huggingFaceUrl;
+      // Determine which OCR service to use
+      const useLayoutLM = options.useLayoutLM === true;
+      const serverlessUrl = useLayoutLM ? this.layoutLMUrl : this.huggingFaceUrl;
       
       // Call our serverless function instead of the API directly
-      console.log('Calling Hugging Face serverless function...');
+      console.log(`Calling ${useLayoutLM ? 'LayoutLMv3' : 'Hugging Face OCR'} serverless function...`);
       const response = await fetch(serverlessUrl, {
         method: 'POST',
         headers: {
@@ -85,18 +87,25 @@ export class OCRService {
         
         console.log('Menu items extracted:', menuItems.length);
         
-        // Log quality metrics from Hugging Face models
+        // Log quality metrics from OCR models
         if (data.debug) {
           const debug = data.debug;
           
           if (debug.bestModel) {
-            console.log('Best OCR result from model:', debug.bestModel);
+            const isLayoutLM = debug.bestModel.includes('layoutlm');
+            console.log(`OCR result from ${isLayoutLM ? 'LayoutLMv3' : 'Hugging Face'} model:`, debug.bestModel);
             console.log('OCR quality metrics:', {
               menuScore: debug.menuScore,
-              menuKeywords: debug.menuKeywords,
               textLength: debug.textLength,
-              extractedItems: debug.extractedItems
+              extractedItems: debug.extractedItems,
+              processingTimeMs: debug.processingTimeMs || 'N/A'
             });
+            
+            if (isLayoutLM) {
+              console.log('LayoutLMv3 provides better menu structure understanding');
+            } else if (debug.menuKeywords) {
+              console.log('Menu keywords detected:', debug.menuKeywords);
+            }
           }
         }
         
