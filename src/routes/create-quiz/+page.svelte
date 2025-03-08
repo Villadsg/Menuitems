@@ -32,7 +32,6 @@
   let ocrError = null;
   let isProcessing = false;
   let debugInfo = null;
-  let useLayoutLM = false; // Toggle for LayoutLMv3
 
   let loading = false;
   let uploadProgress = 0;
@@ -122,7 +121,7 @@
       );
       
       // Process the image with OCR
-      const ocrResultResponse = await OCRService.processMenuImage(fileId, bucketId, { useLayoutLM });
+      const ocrResultResponse = await OCRService.processMenuImage(fileId, bucketId);
       ocrResult = ocrResultResponse;
       debugInfo = ocrResultResponse.debug;
       
@@ -134,27 +133,23 @@
         if (ocrResultResponse.debug) {
           const debug = ocrResultResponse.debug;
           
-          if (debug.bestModel) {
-            // Get model info
-            const modelName = debug.bestModel.split('/').pop(); // Get just the model name without org
-            const isLayoutLM = debug.bestModel.includes('layoutlm');
-            const qualityIndicator = debug.menuScore > 8 ? 'excellent' : 
-                                    debug.menuScore > 5 ? 'good' : 
-                                    debug.menuScore > 3 ? 'fair' : 'basic';
+          if (debug.model) {
+            // Get quality indicator based on extracted items
+            const qualityIndicator = debug.extractedItems > 15 ? 'excellent' : 
+                                    debug.extractedItems > 10 ? 'good' : 
+                                    debug.extractedItems > 5 ? 'fair' : 'basic';
             
             toasts.success(
-              `Menu text extracted successfully using ${isLayoutLM ? 'LayoutLMv3' : modelName} model! ` +
+              `Menu text extracted successfully using Mistral OCR! ` +
               `(${qualityIndicator} quality, ${debug.extractedItems} items found)`
             );
             
             // Log additional details for debugging
-            console.log(`${isLayoutLM ? 'LayoutLMv3' : 'Hugging Face'} Quality Metrics:`, {
-              model: debug.bestModel,
-              score: debug.menuScore,
+            console.log(`Mistral OCR Quality Metrics:`, {
+              model: debug.model,
               processingTimeMs: debug.processingTimeMs || 'N/A',
               textLength: debug.textLength,
-              extractedItems: debug.extractedItems,
-              ...(debug.menuKeywords ? { keywords: debug.menuKeywords } : {})
+              extractedItems: debug.extractedItems
             });
           } else {
             toasts.success('Menu text extracted successfully!');
@@ -352,21 +347,18 @@
                     <img src={photoPreviewUrl} alt="Menu preview" class="max-w-full h-auto rounded-md shadow-sm" />
                   </div>
                   
-                  <!-- OCR Options -->
+                  <!-- OCR Info -->
                   <div class="mt-4 flex items-center">
-                    <input 
-                      type="checkbox" 
-                      id="useLayoutLM" 
-                      bind:checked={useLayoutLM} 
-                      class="form-checkbox h-5 w-5 text-blue-600 rounded focus:ring-blue-500"
-                    />
-                    <label for="useLayoutLM" class="ml-2 block text-sm text-gray-700">
-                      Use LayoutLMv3 (better for complex menu layouts)
-                    </label>
+                    <div class="text-sm text-gray-700 flex items-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-500 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2h-1V9z" clip-rule="evenodd" />
+                      </svg>
+                      Using Mistral OCR for text extraction
+                    </div>
                     <div class="ml-2 group relative">
                       <span class="text-gray-500 cursor-help">ⓘ</span>
                       <div class="absolute bottom-full mb-2 left-0 transform -translate-x-1/2 hidden group-hover:block bg-gray-800 text-white text-xs rounded p-2 w-64 shadow-lg">
-                        LayoutLMv3 is a document AI model that understands both text content and layout structure, providing better results for complex menus.
+                        Mistral OCR is a powerful document AI model that extracts text from images with high accuracy.
                       </div>
                     </div>
                   </div>
@@ -379,7 +371,7 @@
                   >
                     {#if ocrProcessing}
                       <Loading size="sm" color="white" />
-                      <span class="ml-2">Processing with {useLayoutLM ? 'LayoutLMv3' : 'Hugging Face OCR'}...</span>
+                      <span class="ml-2">Processing with Mistral OCR...</span>
                     {:else}
                       Extract Menu Text
                     {/if}
@@ -491,26 +483,10 @@
                     <details>
                       <summary>Click to expand debug details</summary>
                       <div class="debug-content">
-                        <h5>Best Model: {debugInfo.bestModel || 'Unknown'}</h5>
-                        
-                        {#if debugInfo.modelResponses}
-                          <h5>Model Responses:</h5>
-                          {#each Object.entries(debugInfo.modelResponses) as [model, response]}
-                            <div class="model-response">
-                              <h6>{model}</h6>
-                              {#if response.error}
-                                <p class="error">Error: {response.error}</p>
-                              {:else}
-                                <p>Status: {response.status}</p>
-                                <p>Text length: {response.text ? response.text.length : 0} characters</p>
-                                <details>
-                                  <summary>View text</summary>
-                                  <pre>{response.text || 'No text'}</pre>
-                                </details>
-                              {/if}
-                            </div>
-                          {/each}
-                        {/if}
+                        <h5>Model: {debugInfo.model || 'Unknown'}</h5>
+                        <p>Text length: {debugInfo.textLength || 0} characters</p>
+                        <p>Extracted items: {debugInfo.extractedItems || 0}</p>
+                        <p>Processing time: {debugInfo.processingTimeMs ? `${debugInfo.processingTimeMs}ms` : 'Unknown'}</p>
                       </div>
                     </details>
                   </div>
@@ -568,16 +544,5 @@
   
   .debug-content {
     padding: 10px;
-  }
-  
-  .model-response {
-    margin-bottom: 15px;
-    padding: 10px;
-    border: 1px solid #eee;
-    border-radius: 4px;
-  }
-  
-  .error {
-    color: #d32f2f;
   }
 </style>

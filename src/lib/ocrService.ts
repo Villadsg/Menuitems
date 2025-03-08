@@ -14,36 +14,35 @@ export interface MenuOCRResult {
 }
 
 export class OCRService {
-  // Using Netlify serverless functions instead of direct API calls
-  private static huggingFaceUrl = '/.netlify/functions/ocr';
-  private static layoutLMUrl = '/.netlify/functions/layoutlm-ocr';
-  private static apiToken = import.meta.env.VITE_HUGGING_FACE_API_TOKEN || '';
+  // Using Netlify serverless function for Mistral OCR API
+  private static mistralOcrUrl = '/.netlify/functions/mistral-ocr';
   
   /**
-   * Process an image with OCR to extract menu text
+   * Process an image with Mistral OCR to extract menu text
    * @param imageFileId The Appwrite storage file ID
    * @param bucketId The Appwrite storage bucket ID
    * @returns Processed menu text data
    */
-  static async processMenuImage(imageFileId: string, bucketId: string, options: { useLayoutLM?: boolean } = {}): Promise<MenuOCRResult> {
+  static async processMenuImage(imageFileId: string, bucketId: string): Promise<MenuOCRResult> {
     try {
-      // Get the file URL from Appwrite
-      const fileUrl = storage.getFileView(bucketId, imageFileId);
+      // Get a direct download URL from Appwrite - this creates a publicly accessible URL
+      const fileUrl = storage.getFileDownload(bucketId, imageFileId);
       console.log('File URL:', fileUrl);
       
-      // Determine which OCR service to use
-      const useLayoutLM = options.useLayoutLM === true;
-      const serverlessUrl = useLayoutLM ? this.layoutLMUrl : this.huggingFaceUrl;
+      // Add a timestamp to avoid caching issues
+      const timestamp = Date.now();
+      const fileUrlWithTimestamp = `${fileUrl}&timestamp=${timestamp}`;
+      console.log('File URL with timestamp:', fileUrlWithTimestamp);
       
-      // Call our serverless function instead of the API directly
-      console.log(`Calling ${useLayoutLM ? 'LayoutLMv3' : 'Hugging Face OCR'} serverless function...`);
-      const response = await fetch(serverlessUrl, {
+      // Call our serverless function for Mistral OCR
+      console.log('Calling Mistral OCR serverless function...');
+      const response = await fetch(this.mistralOcrUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ 
-          imageUrl: fileUrl
+          imageUrl: fileUrlWithTimestamp
         }),
       });
       
@@ -73,67 +72,66 @@ export class OCRService {
       }
       
       const data = await response.json();
-      console.log('OCR API response:', data);
+      console.log('Mistral OCR API response:', data);
       
-      // Handle the new response format with debug info
-      let ocrResult: MenuOCRResult;
+      // Extract text specifically from Mistral OCR response format
+      let rawText = '';
       
-      if (data.result && Array.isArray(data.result) && data.result[0] && data.result[0].generated_text) {
-        const rawText = data.result[0].generated_text;
+      // Check if the response contains the standard Mistral OCR format with pages array
+      if (data.pages && Array.isArray(data.pages)) {
+        console.log('Found pages array with', data.pages.length, 'pages');
         
-        // Use the pre-processed menu items from the serverless function if available
-        // Otherwise fall back to client-side processing
-        const menuItems = data.menuItems || this.processMenuText(rawText);
-        
-        console.log('Menu items extracted:', menuItems.length);
-        
-        // Log quality metrics from OCR models
-        if (data.debug) {
-          const debug = data.debug;
-          
-          if (debug.bestModel) {
-            const isLayoutLM = debug.bestModel.includes('layoutlm');
-            console.log(`OCR result from ${isLayoutLM ? 'LayoutLMv3' : 'Hugging Face'} model:`, debug.bestModel);
-            console.log('OCR quality metrics:', {
-              menuScore: debug.menuScore,
-              textLength: debug.textLength,
-              extractedItems: debug.extractedItems,
-              processingTimeMs: debug.processingTimeMs || 'N/A'
-            });
-            
-            if (isLayoutLM) {
-              console.log('LayoutLMv3 provides better menu structure understanding');
-            } else if (debug.menuKeywords) {
-              console.log('Menu keywords detected:', debug.menuKeywords);
-            }
+        // Concatenate markdown from all pages
+        for (const page of data.pages) {
+          if (page.markdown) {
+            rawText += page.markdown + '\n\n';
+            console.log('Extracted markdown from page', page.index || 'unknown');
           }
         }
         
-        ocrResult = {
-          rawText,
-          menuItems,
-          debug: data.debug || {}
-        };
-      } else if (data.text && data.usedFallback) {
-        // Handle fallback model response format
-        console.log('Processing text from fallback OCR model');
-        const rawText = data.text;
-        const menuItems = this.processMenuText(rawText);
-        
-        ocrResult = {
-          rawText,
-          menuItems,
-          debug: { usedFallback: true, modelResponses: data.modelResponses }
-        };
+        if (rawText) {
+          console.log('Successfully extracted text from pages');
+        } else {
+          console.warn('Pages array found but no markdown content');
+          // Log the structure of the first page for debugging
+          if (data.pages.length > 0) {
+            console.log('First page structure:', Object.keys(data.pages[0]));
+          }
+        }
+      } 
+      // Fall back to other possible formats
+      else if (data.text) {
+        rawText = data.text;
+        console.log('Text found directly in response.text');
+      } else if (data.rawText) {
+        rawText = data.rawText;
+        console.log('Text found in response.rawText');
+      } else if (data.extractedText) {
+        rawText = data.extractedText;
+        console.log('Text found in response.extractedText');
+      } else if (typeof data === 'string') {
+        rawText = data;
+        console.log('Response is directly a string');
       } else {
-        // Fallback for unexpected response format
-        console.warn('Unexpected OCR response format:', data);
-        ocrResult = {
-          rawText: JSON.stringify(data),
-          menuItems: [],
-          debug: data.debug || {}
-        };
+        console.log('Response structure:', Object.keys(data));
+        console.warn('Could not find text in the response. Using empty string.');
       }
+      
+      // Process the extracted text to identify menu items
+      const menuItems = this.processMenuText(rawText);
+      console.log('Menu items extracted:', menuItems.length);
+      
+      // Create the OCR result
+      const ocrResult: MenuOCRResult = {
+        rawText,
+        menuItems,
+        debug: {
+          model: data.model || 'mistral-ocr-latest',
+          textLength: rawText.length,
+          extractedItems: menuItems.length,
+          processingTimeMs: data.processingTimeMs || 0
+        }
+      };
       
       console.log('Processed OCR result:', ocrResult);
       return ocrResult;
@@ -152,7 +150,7 @@ export class OCRService {
       } else if (error.message.includes('service is temporarily unavailable') || 
                  error.message.includes('status code 503') || 
                  error.message.includes('unavailable')) {
-        userMessage = 'The Hugging Face OCR service is temporarily unavailable. Please try again later.';
+        userMessage = 'The Mistral OCR service is temporarily unavailable. Please try again later.';
       }
       
       // Create a structured error with additional context

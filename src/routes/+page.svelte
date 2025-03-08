@@ -26,8 +26,8 @@
   const features = [
     {
       icon: 'fas fa-utensils',
-      title: 'Local Menus',
-      description: 'Find and browse menu content from restaurants in your area'
+      title: 'Local Menus as one Menu',
+      description: 'Find and browse menu content from restaurants in your area and see it as just one big menu'
     },
     {
       icon: 'fas fa-language',
@@ -116,13 +116,13 @@
           <div class="flex flex-col space-y-4">
             <a href="/find-quiz">
               <button class="bg-green-500 hover:bg-green-600 transition-colors btn btn-primary w-full flex items-center justify-center">
-                <i class="fas fa-search mr-2"></i> Browse Menus
+                <i class="fas fa-search mr-2"></i> Browse Menu Content
               </button>
             </a>
             
             <a href="/create-quiz">
               <button class="bg-green-500 hover:bg-green-600 transition-colors btn btn-primary w-full flex items-center justify-center">
-                <i class="fas fa-plus-circle mr-2"></i> Add Your Menu
+                <i class="fas fa-plus-circle mr-2"></i> Add Your Menu Content
               </button>
             </a>
             
