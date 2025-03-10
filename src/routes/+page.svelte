@@ -99,7 +99,7 @@
       </div>
       
       <div class="bg-white rounded-lg shadow-md p-6">
-        <h2 class="text-2xl font-bold mb-4">Nearby Restaurants</h2>
+        <h2 class="text-2xl font-bold mb-4">Nearby menus</h2>
         <div class="h-96 w-full">
           <Map />
         </div>

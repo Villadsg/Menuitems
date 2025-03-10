@@ -42,7 +42,7 @@
     <div class="container mx-auto px-4">
       <div class="flex justify-between items-center h-16">
         <a href="/" class="flex items-center space-x-2" aria-label="MenuMap Home">
-          <img src="/log35.jpg" class="h-10 w-10" alt="MenuMap Logo" />
+          <img src="/log35.png" class="h-10 w-10" alt="MenuMap Logo" />
           <span class="text-xl font-bold text-green-600">MenuMap</span>
         </a>
         
