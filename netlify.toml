@@ -18,7 +18,9 @@
   framework = "#custom"
 
 # Environment variables for local development
+# Note: Actual values should be set in Netlify dashboard or .env file
 [dev.environment]
-  MISTRAL_API_KEY = "e3C0jQxmSeX2NgrCSaafp9s4w6FhGQ38"
-  HUGGING_FACE_API_TOKEN = "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"
-  VITE_HUGGING_FACE_API_TOKEN = "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"
+  # These are placeholders - do not put actual API keys here
+  MISTRAL_API_KEY = ""
+  HUGGING_FACE_API_TOKEN = ""
+  VITE_HUGGING_FACE_API_TOKEN = ""
