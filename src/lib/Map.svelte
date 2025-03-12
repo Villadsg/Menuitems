@@ -11,17 +11,32 @@
                 L = leaflet;
                 await import('leaflet/dist/leaflet.css');
 
-                // Get the user's current location
-                const { getCurrentLocation } = await import('$lib/location');
-                const location = await getCurrentLocation();
-                const userLocation: [number, number] = [location.latitude, location.longitude];
+                // Get the user's current location or use Copenhagen as default
+                const { getCurrentLocation, DEFAULT_LOCATION } = await import('$lib/location');
+                let userLocation: [number, number];
+                
+                try {
+                    const location = await getCurrentLocation();
+                    userLocation = [location.latitude, location.longitude];
+                    console.log('Using user location:', userLocation);
+                } catch (locationError) {
+                    // If there's an error getting the user's location, use Copenhagen as default
+                    userLocation = [DEFAULT_LOCATION.latitude, DEFAULT_LOCATION.longitude];
+                    console.log('Using default location (Copenhagen):', userLocation);
+                }
 
-                // Initialize the map centered on the user's location
+                // Initialize the map centered on the user's location or Copenhagen
                 const map = L.map(mapElement).setView(userLocation, 13);
 
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
                 }).addTo(map);
+
+                // Add a marker for the user's location
+                L.marker(userLocation)
+                    .addTo(map)
+                    .bindPopup('Your location (or default location if not available)')
+                    .openPopup();
 
                 // Define the custom icon for monuments
                 const customIcon = L.icon({

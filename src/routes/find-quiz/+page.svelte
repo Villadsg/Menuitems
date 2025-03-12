@@ -72,11 +72,22 @@ const loadMonuments = async () => {
 
   const findLocation = async () => {
     try {
-      const location = await getCurrentLocation(); // Get user's location
+      // Import DEFAULT_LOCATION for fallback
+      const { DEFAULT_LOCATION } = await import('$lib/location');
+      
+      // Get user's location or use default Copenhagen location
+      const location = await getCurrentLocation();
       latitude = location.latitude;
       longitude = location.longitude;
-      status = `Latitude: ${latitude}, Longitude: ${longitude}`;
+      
+      // If using default location, indicate this in the status
+      if (latitude === DEFAULT_LOCATION.latitude && longitude === DEFAULT_LOCATION.longitude) {
+        status = `Using default location (Copenhagen). Monuments are sorted by distance from there.`;
+      } else {
+        status = `Using your current location. Latitude: ${latitude}, Longitude: ${longitude}`;
+      }
 
+      // Calculate distances and sort monuments
       sortedMonuments = monuments
         .map(monument => {
           const distance = calculateDistance(latitude, longitude, monument.lat, monument.lng);
@@ -86,7 +97,22 @@ const loadMonuments = async () => {
 
       page = 'results';
     } catch (error) {
-      status = error.message;
+      console.error('Error in findLocation:', error);
+      // Import DEFAULT_LOCATION for fallback in case of error
+      const { DEFAULT_LOCATION } = await import('$lib/location');
+      latitude = DEFAULT_LOCATION.latitude;
+      longitude = DEFAULT_LOCATION.longitude;
+      status = `Using default location (Copenhagen). Error: ${error.message}`;
+      
+      // Calculate distances from default location
+      sortedMonuments = monuments
+        .map(monument => {
+          const distance = calculateDistance(latitude, longitude, monument.lat, monument.lng);
+          return { ...monument, distance };
+        })
+        .sort((a, b) => a.distance - b.distance);
+        
+      page = 'results';
     }
   };
   

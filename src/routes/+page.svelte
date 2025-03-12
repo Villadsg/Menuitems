@@ -15,10 +15,23 @@
     checkUser(); // Check user login status when the component is mounted
 
     try {
-      const location = await getCurrentLocation();
-      userLocation = [location.latitude, location.longitude];
+      // Import DEFAULT_LOCATION for fallback
+      const { DEFAULT_LOCATION } = await import('$lib/location');
+      
+      try {
+        const location = await getCurrentLocation();
+        userLocation = [location.latitude, location.longitude];
+        console.log('Using user location:', userLocation);
+      } catch (err) {
+        // If there's an error getting the user's location, use Copenhagen as default
+        userLocation = [DEFAULT_LOCATION.latitude, DEFAULT_LOCATION.longitude];
+        console.log('Using default location (Copenhagen):', userLocation);
+      }
     } catch (err) {
-      console.error('Error fetching location:', err);
+      console.error('Error in location handling:', err);
+      // Hardcoded Copenhagen coordinates as last resort
+      userLocation = [55.6761, 12.5683];
+      console.log('Using hardcoded default location (Copenhagen):', userLocation);
     }
   });
 
