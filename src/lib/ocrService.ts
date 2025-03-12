@@ -14,8 +14,22 @@ export interface MenuOCRResult {
 }
 
 export class OCRService {
-  // Using Netlify serverless function for Mistral OCR API
-  private static mistralOcrUrl = '/.netlify/functions/mistral-ocr';
+  // Support both Netlify and Vercel serverless functions for Mistral OCR API
+  private static netlifyOcrUrl = '/.netlify/functions/mistral-ocr';
+  private static vercelOcrUrl = '/api/mistral-ocr';
+  
+  /**
+   * Get the appropriate OCR URL based on the deployment environment
+   * @returns The OCR API URL
+   */
+  private static getOcrUrl(): string {
+    // Check if we're on Vercel by looking for the vercel.app domain
+    const isVercel = typeof window !== 'undefined' && 
+                    (window.location.hostname.includes('vercel.app') || 
+                     window.location.hostname.includes('vercel-analytics'));
+    
+    return isVercel ? this.vercelOcrUrl : this.netlifyOcrUrl;
+  }
   
   /**
    * Process an image with Mistral OCR to extract menu text
@@ -35,8 +49,9 @@ export class OCRService {
       console.log('File URL with timestamp:', fileUrlWithTimestamp);
       
       // Call our serverless function for Mistral OCR
-      console.log('Calling Mistral OCR serverless function...');
-      const response = await fetch(this.mistralOcrUrl, {
+      const ocrUrl = this.getOcrUrl();
+      console.log('Calling Mistral OCR serverless function at:', ocrUrl);
+      const response = await fetch(ocrUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -135,28 +150,34 @@ export class OCRService {
       
       console.log('Processed OCR result:', ocrResult);
       return ocrResult;
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('OCR processing error:', error);
       
       // Create a more user-friendly error message
       let userMessage = 'Failed to process menu image';
       
-      if (error.message.includes('timeout') || error.message.includes('timed out')) {
-        userMessage = 'The OCR processing timed out. Please try again with a clearer image or try later.';
-      } else if (error.message.includes('rate limit')) {
-        userMessage = 'OCR service rate limit exceeded. Please try again in a few minutes.';
-      } else if (error.message.includes('Failed to parse error response')) {
-        userMessage = 'The OCR service is currently experiencing issues. Please try again later.';
-      } else if (error.message.includes('service is temporarily unavailable') || 
-                 error.message.includes('status code 503') || 
-                 error.message.includes('unavailable')) {
-        userMessage = 'The Mistral OCR service is temporarily unavailable. Please try again later.';
+      // Type guard to check if error is an Error object with a message property
+      if (error instanceof Error) {
+        if (error.message.includes('timeout') || error.message.includes('timed out')) {
+          userMessage = 'The OCR processing timed out. Please try again with a clearer image or try later.';
+        } else if (error.message.includes('rate limit')) {
+          userMessage = 'OCR service rate limit exceeded. Please try again in a few minutes.';
+        } else if (error.message.includes('Failed to parse error response')) {
+          userMessage = 'The OCR service is currently experiencing issues. Please try again later.';
+        } else if (error.message.includes('service is temporarily unavailable') || 
+                  error.message.includes('status code 503') || 
+                  error.message.includes('unavailable')) {
+          userMessage = 'The Mistral OCR service is temporarily unavailable. Please try again later.';
+        }
       }
       
       // Create a structured error with additional context
       const enhancedError = new Error(userMessage);
-      enhancedError.cause = error;
-      enhancedError.originalMessage = error.message;
+      // Use type assertion for cause property
+      (enhancedError as any).cause = error;
+      if (error instanceof Error) {
+        (enhancedError as any).originalMessage = error.message;
+      }
       
       throw enhancedError;
     }
@@ -167,9 +188,9 @@ export class OCRService {
    * @param text Raw OCR text
    * @returns Structured menu items
    */
-  private static processMenuText(text: string) {
+  private static processMenuText(text: string): MenuOCRResult['menuItems'] {
     const lines = text.split('\n').filter(line => line.trim());
-    const menuItems = [];
+    const menuItems: MenuOCRResult['menuItems'] = [];
     let currentCategory = 'Uncategorized';
     
     for (const line of lines) {
@@ -180,12 +201,13 @@ export class OCRService {
       if (line.match(/^[A-Z\s]+$/) || line.endsWith(':')) {
         currentCategory = line.trim().replace(/:$/, '');
         menuItems.push({
+          name: currentCategory,
           category: currentCategory
         });
       } else if (priceMatch) {
         // This is likely a menu item with price
         const price = priceMatch[0];
-        const name = line.substring(0, priceMatch.index).trim();
+        const name = line.substring(0, priceMatch.index !== undefined ? priceMatch.index : line.length).trim();
         const description = line.substring(priceMatch.index + price.length).trim();
         
         menuItems.push({

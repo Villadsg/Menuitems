@@ -31,7 +31,6 @@
   let ocrResult = null;
   let ocrError = null;
   let isProcessing = false;
-  let debugInfo = null;
 
   let loading = false;
   let uploadProgress = 0;
@@ -103,7 +102,7 @@
       isProcessing = true;
       ocrError = null;
       ocrResult = null;
-      debugInfo = null;
+   
       
       // Upload the file temporarily to get a file ID
       const fileToUpload = compressedFile || filesMainPhoto?.[0];
@@ -123,7 +122,6 @@
       // Process the image with OCR
       const ocrResultResponse = await OCRService.processMenuImage(fileId, bucketId);
       ocrResult = ocrResultResponse;
-      debugInfo = ocrResultResponse.debug;
       
       // If we have OCR data, populate the description field
       if (ocrResultResponse && ocrResultResponse.rawText) {
@@ -449,11 +447,7 @@
             
             {#if ocrResult}
               <div class="ocr-results">
-                <h3>OCR Results</h3>
-                <div class="raw-text">
-                  <h4>Raw Text:</h4>
-                  <pre>{ocrResult.rawText}</pre>
-                </div>
+                <h3 class="text-xl font-semibold mb-4">OCR Results</h3>
                 
                 {#if ocrResult.menuItems && ocrResult.menuItems.length > 0}
                   <div class="menu-items">
@@ -565,20 +559,7 @@
                   </div>
                 {/if}
                 
-                {#if debugInfo}
-                  <div class="debug-info">
-                    <h4>Debug Information:</h4>
-                    <details>
-                      <summary>Click to expand debug details</summary>
-                      <div class="debug-content">
-                        <h5>Model: {debugInfo.model || 'Unknown'}</h5>
-                        <p>Text length: {debugInfo.textLength || 0} characters</p>
-                        <p>Extracted items: {debugInfo.extractedItems || 0}</p>
-                        <p>Processing time: {debugInfo.processingTimeMs ? `${debugInfo.processingTimeMs}ms` : 'Unknown'}</p>
-                      </div>
-                    </details>
-                  </div>
-                {/if}
+             
               </div>
             {/if}
             
