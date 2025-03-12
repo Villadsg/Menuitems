@@ -122,7 +122,7 @@
             
             <a href="/create-quiz">
               <button class="bg-green-500 hover:bg-green-600 transition-colors btn btn-primary w-full flex items-center justify-center">
-                <i class="fas fa-plus-circle mr-2"></i> Add Your Menu Content
+                <i class="fas fa-plus-circle mr-2"></i> Add Your Menu
               </button>
             </a>
             

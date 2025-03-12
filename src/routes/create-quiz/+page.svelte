@@ -457,23 +457,111 @@
                 
                 {#if ocrResult.menuItems && ocrResult.menuItems.length > 0}
                   <div class="menu-items">
-                    <h4>Menu Items:</h4>
-                    <ul>
-                      {#each ocrResult.menuItems as item}
-                        <li>
-                          {#if item.category && !item.name}
-                            <strong>{item.category}</strong>
-                          {:else}
-                            {#if item.name}<span class="item-name">{item.name}</span>{/if}
-                            {#if item.price}<span class="item-price">{item.price}</span>{/if}
-                            {#if item.description}<span class="item-desc">{item.description}</span>{/if}
-                            {#if !item.name && !item.price && !item.description}
-                              <span>{JSON.stringify(item)}</span>
-                            {/if}
-                          {/if}
-                        </li>
-                      {/each}
-                    </ul>
+                    <h4 class="text-lg font-semibold mb-3">Menu Items:</h4>
+                    
+                    <!-- Categories and their items -->
+                    {#each [...new Set(ocrResult.menuItems.map(item => item.category))] as category}
+                      {#if category}
+                        <div class="mb-4">
+                          <h5 class="text-md font-semibold text-gray-700 mb-2">{category}</h5>
+                          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {#each ocrResult.menuItems.filter(item => item.category === category && item.name) as item}
+                              {@const itemId = `item-${Math.random().toString(36).substring(2, 9)}`}
+                              <div class="menu-item-box">
+                                <button 
+                                  class="menu-item-button"
+                                  on:click={() => {
+                                    const detailsEl = document.getElementById(itemId);
+                                    if (detailsEl) {
+                                      detailsEl.classList.toggle('hidden');
+                                    }
+                                  }}
+                                >
+                                  <div class="flex justify-between items-center w-full">
+                                    <span class="item-name font-medium">{item.name}</span>
+                                    {#if item.price}
+                                      <span class="item-price text-green-600 font-semibold">{item.price}</span>
+                                    {/if}
+                                  </div>
+                                </button>
+                                
+                                <!-- Hidden details section -->
+                                <div id={itemId} class="menu-item-details hidden">
+                                  {#if item.description}
+                                    <p class="text-gray-600 text-sm mt-1">{item.description}</p>
+                                  {/if}
+                                  <div class="flex justify-end mt-2">
+                                    <button 
+                                      class="text-xs text-gray-500 hover:text-gray-700"
+                                      on:click={(e) => {
+                                        e.stopPropagation();
+                                        const detailsEl = document.getElementById(itemId);
+                                        if (detailsEl) {
+                                          detailsEl.classList.add('hidden');
+                                        }
+                                      }}
+                                    >
+                                      Close
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            {/each}
+                          </div>
+                        </div>
+                      {/if}
+                    {/each}
+                    
+                    <!-- Items without categories -->
+                    {#if ocrResult.menuItems.some(item => !item.category && item.name)}
+                      <div class="mb-4">
+                        <h5 class="text-md font-semibold text-gray-700 mb-2">Other Items</h5>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {#each ocrResult.menuItems.filter(item => !item.category && item.name) as item}
+                            {@const itemId = `item-${Math.random().toString(36).substring(2, 9)}`}
+                            <div class="menu-item-box">
+                              <button 
+                                class="menu-item-button"
+                                on:click={() => {
+                                  const detailsEl = document.getElementById(itemId);
+                                  if (detailsEl) {
+                                    detailsEl.classList.toggle('hidden');
+                                  }
+                                }}
+                              >
+                                <div class="flex justify-between items-center w-full">
+                                  <span class="item-name font-medium">{item.name}</span>
+                                  {#if item.price}
+                                    <span class="item-price text-green-600 font-semibold">{item.price}</span>
+                                  {/if}
+                                </div>
+                              </button>
+                              
+                              <!-- Hidden details section -->
+                              <div id={itemId} class="menu-item-details hidden">
+                                {#if item.description}
+                                  <p class="text-gray-600 text-sm mt-1">{item.description}</p>
+                                {/if}
+                                <div class="flex justify-end mt-2">
+                                  <button 
+                                    class="text-xs text-gray-500 hover:text-gray-700"
+                                    on:click={(e) => {
+                                      e.stopPropagation();
+                                      const detailsEl = document.getElementById(itemId);
+                                      if (detailsEl) {
+                                        detailsEl.classList.add('hidden');
+                                      }
+                                    }}
+                                  >
+                                    Close
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          {/each}
+                        </div>
+                      </div>
+                    {/if}
                   </div>
                 {/if}
                 
@@ -544,5 +632,44 @@
   
   .debug-content {
     padding: 10px;
+  }
+  
+  .menu-item-box {
+    background-color: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    transition: all 0.2s ease;
+  }
+  
+  .menu-item-box:hover {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  }
+  
+  .menu-item-button {
+    width: 100%;
+    text-align: left;
+    padding: 0.75rem 1rem;
+    background-color: white;
+    transition: background-color 0.2s ease;
+  }
+  
+  .menu-item-button:hover {
+    background-color: #f9fafb;
+  }
+  
+  .menu-item-details {
+    padding: 0.75rem 1rem;
+    border-top: 1px solid #e5e7eb;
+    background-color: #f9fafb;
+  }
+  
+  .item-name {
+    display: block;
+    color: #1f2937;
+  }
+  
+  .item-price {
+    white-space: nowrap;
   }
 </style>

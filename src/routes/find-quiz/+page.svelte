@@ -183,6 +183,7 @@ const closeTooFarMessage = () => {
         {/each}
       {:else}
         <p class="text-center text-gray-500">No menu content found</p>
+        <p class="text-center text-gray-500"> Sign up to review and see the locations</p>
       {/if}
        <h1 class="text-2xl font-bold mb-6 text-center">Map of places</h1>
       <Map monuments={monuments} />
