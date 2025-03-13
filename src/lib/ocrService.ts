@@ -10,6 +10,7 @@ export interface MenuOCRResult {
     category?: string;
   }[];
   rawText: string;
+  enhancedStructure?: any;
   debug?: any;
 }
 
@@ -132,19 +133,37 @@ export class OCRService {
         console.warn('Could not find text in the response. Using empty string.');
       }
       
-      // Process the extracted text to identify menu items
-      const menuItems = this.processMenuText(rawText);
-      console.log('Menu items extracted:', menuItems.length);
+      // Try to use enhanced menu structure analysis
+      let enhancedMenuStructure = null;
+      let menuItems;
+      
+      try {
+        // Call the new menu structure analysis
+        console.log('Attempting enhanced menu structure analysis...');
+        enhancedMenuStructure = await this.analyzeMenuStructure(rawText);
+        console.log('Enhanced menu structure:', enhancedMenuStructure);
+        
+        // Convert the enhanced structure to menu items
+        menuItems = this.convertEnhancedStructureToMenuItems(enhancedMenuStructure);
+        console.log('Menu items extracted from enhanced structure:', menuItems.length);
+      } catch (analysisError) {
+        console.error('Enhanced menu analysis failed, falling back to basic processing:', analysisError);
+        // Fall back to basic processing if enhanced analysis fails
+        menuItems = this.processMenuText(rawText);
+        console.log('Menu items extracted from basic processing:', menuItems.length);
+      }
       
       // Create the OCR result
       const ocrResult: MenuOCRResult = {
         rawText,
         menuItems,
+        enhancedStructure: enhancedMenuStructure,
         debug: {
           model: data.model || 'mistral-ocr-latest',
           textLength: rawText.length,
           extractedItems: menuItems.length,
-          processingTimeMs: data.processingTimeMs || 0
+          processingTimeMs: data.processingTimeMs || 0,
+          enhancedAnalysis: !!enhancedMenuStructure
         }
       };
       
@@ -207,8 +226,9 @@ export class OCRService {
       } else if (priceMatch) {
         // This is likely a menu item with price
         const price = priceMatch[0];
-        const name = line.substring(0, priceMatch.index !== undefined ? priceMatch.index : line.length).trim();
-        const description = line.substring(priceMatch.index + price.length).trim();
+        const priceIndex = priceMatch.index || 0; // Default to 0 if undefined
+        const name = line.substring(0, priceIndex).trim();
+        const description = line.substring(priceIndex + price.length).trim();
         
         menuItems.push({
           name,
@@ -236,21 +256,34 @@ export class OCRService {
    */
   static async saveOCRResults(menuId: string, ocrResult: MenuOCRResult, collectionId: string): Promise<void> {
     try {
-      // First, save the raw text to the menu document
+      // Create a structured and separable format for menu items
+      const structuredMenuItems = this.createStructuredMenuItems(ocrResult.menuItems);
+      
+      // First, save the raw text, enhanced structure, and structured menu items to the menu document
+      const updateData: any = {
+        ocr_raw_text: ocrResult.rawText,
+        ocr_processed: true,
+        ocrdata: JSON.stringify(structuredMenuItems) // Store structured menu items in ocrdata field
+      };
+      
+      // Add enhanced structure if available
+      if (ocrResult.enhancedStructure) {
+        updateData.ocr_enhanced_structure = JSON.stringify(ocrResult.enhancedStructure);
+      }
+      
+      console.log('Saving structured menu data to Appwrite:', structuredMenuItems);
+      
       await databases.updateDocument(
         AppwriteService.databaseId,
         collectionId,
         menuId,
-        { 
-          ocr_raw_text: ocrResult.rawText,
-          ocr_processed: true
-        }
+        updateData
       );
       
-      // Then save each menu item to a separate collection
+      // Then save each menu item to a separate collection for individual access
       for (const item of ocrResult.menuItems) {
-        // Skip category entries (they don't have a name)
-        if (!item.name) continue;
+        // Skip category entries (they don't have a price)
+        if (!item.name || item.name === item.category) continue;
         
         await databases.createDocument(
           AppwriteService.databaseId,
@@ -269,5 +302,120 @@ export class OCRService {
       console.error('Error saving OCR results:', error);
       throw error;
     }
+  }
+  
+  /**
+   * Enhanced menu structure analysis using LLM
+   * @param rawText Raw OCR text
+   * @returns Structured menu data with sections and items
+   */
+  static async analyzeMenuStructure(rawText: string): Promise<any> {
+    try {
+      // Get the appropriate URL based on deployment environment
+      const isVercel = typeof window !== 'undefined' && 
+                      (window.location.hostname.includes('vercel.app') || 
+                       window.location.hostname.includes('vercel-analytics'));
+      
+      const analysisUrl = isVercel ? '/api/menu-structure-analysis' : '/.netlify/functions/menu-structure-analysis';
+      
+      console.log('Calling menu structure analysis at:', analysisUrl);
+      const response = await fetch(analysisUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          ocrText: rawText
+        }),
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Menu structure analysis failed: ${response.statusText}. ${errorText}`);
+      }
+      
+      const data = await response.json();
+      return data.menuStructure;
+    } catch (error) {
+      console.error('Menu structure analysis error:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Convert the enhanced menu structure to the MenuOCRResult format
+   * @param enhancedStructure The enhanced menu structure from LLM analysis
+   * @returns Menu items in the format expected by the application
+   */
+  private static convertEnhancedStructureToMenuItems(enhancedStructure: any): MenuOCRResult['menuItems'] {
+    const menuItems: MenuOCRResult['menuItems'] = [];
+    
+    if (enhancedStructure && enhancedStructure.menuSections) {
+      for (const section of enhancedStructure.menuSections) {
+        // Add the section header as a menu item
+        menuItems.push({
+          name: section.sectionName,
+          category: section.sectionName
+        });
+        
+        // Add each item in the section
+        if (section.items && Array.isArray(section.items)) {
+          for (const item of section.items) {
+            menuItems.push({
+              name: item.name,
+              price: item.price || '',
+              description: item.description || '',
+              category: section.sectionName
+            });
+          }
+        }
+      }
+    }
+    
+    return menuItems;
+  }
+  
+  /**
+   * Create a structured format for menu items that makes them easily separable
+   * @param menuItems The menu items to structure
+   * @returns A structured format with sections and items
+   */
+  private static createStructuredMenuItems(menuItems: MenuOCRResult['menuItems']): any {
+    // Group menu items by category
+    const categorizedItems: Record<string, any[]> = {};
+    
+    // First pass: identify all categories
+    for (const item of menuItems) {
+      const category = item.category || 'Uncategorized';
+      
+      if (!categorizedItems[category]) {
+        categorizedItems[category] = [];
+      }
+      
+      // Only add actual menu items (not category headers) to the items array
+      if (item.name !== category) {
+        categorizedItems[category].push({
+          name: item.name,
+          price: item.price || null,
+          description: item.description || '',
+          id: ID.unique() // Add a unique ID for each item to make them easily referenceable
+        });
+      }
+    }
+    
+    // Convert to array format for better structure
+    const structuredMenu = {
+      sections: Object.keys(categorizedItems).map(category => ({
+        name: category,
+        items: categorizedItems[category]
+      })),
+      metadata: {
+        totalItems: menuItems.filter(item => item.name !== item.category).length,
+        totalSections: Object.keys(categorizedItems).length,
+        createdAt: new Date().toISOString()
+      }
+    };
+    
+    return structuredMenu;
   }
 }

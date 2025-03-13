@@ -14,7 +14,6 @@
   import { OCRService } from '$lib/ocrService'; // Import OCR service
  
   let routeName = '';
-  let Description = '';
   let lat = '';
   let gpsMessage = '';
   let lng = '';
@@ -27,7 +26,6 @@
   let compressedFile: File | null = null;
   let photoPreviewUrl: string | null = null;
   let ocrProcessing = false;
-  let ocrData = null;
   let ocrResult = null;
   let ocrError = null;
   let isProcessing = false;
@@ -123,9 +121,8 @@
       const ocrResultResponse = await OCRService.processMenuImage(fileId, bucketId);
       ocrResult = ocrResultResponse;
       
-      // If we have OCR data, populate the description field
+      // Log OCR data for debugging
       if (ocrResultResponse && ocrResultResponse.rawText) {
-        Description = ocrResultResponse.rawText.substring(0, 500); // Limit to 500 chars
         
         // Show which model was used and quality metrics
         if (ocrResultResponse.debug) {
@@ -171,10 +168,9 @@
       toasts.error('Error extracting menu text: ' + errorMessage);
       ocrError = errorMessage;
       
-      // If we have a partial result, still try to use it
+      // If we have a partial result, notify the user
       if (ocrResult && ocrResult.rawText && ocrResult.rawText.length > 20) {
-        Description = ocrResult.rawText.substring(0, 500);
-        toasts.info('Partial text was extracted. You may need to edit it manually.');
+        toasts.info('Partial text was extracted from the menu image.');
       }
     } finally {
       ocrProcessing = false;
@@ -237,10 +233,9 @@
       }
       
       // Create the document in the database
-      const documentData = {
+      const documentData: Record<string, any> = {
         userId: userId,
         Route_name: routeName,
-        Description: Description,
         lat: parseFloat(lat),
         lng: parseFloat(lng),
         dateModified: currentDate,
@@ -248,8 +243,17 @@
       };
       
       // Add OCR data if available
-      if (ocrData) {
-        documentData.ocrdata = JSON.stringify(ocrData);
+      if (ocrResult && ocrResult.menuItems) {
+        // Format menu items to ensure they're separatable
+        const structuredMenuItems = ocrResult.menuItems.map(item => ({
+          name: item.name || '',
+          description: item.description || '',
+          price: item.price || '',
+          category: item.category || 'Uncategorized'
+        }));
+        
+        // Add OCR data to the document
+        documentData.ocrdata = JSON.stringify(structuredMenuItems);
       }
       
       const response = await databases.createDocument(
@@ -303,13 +307,13 @@
       <div in:fly={{ y: 20, duration: 300 }} class="max-w-2xl mx-auto">
         <Card padding="p-8">
           <div class="mb-6">
-            <h1 class="text-3xl font-bold text-gray-800 mb-2">Add Restaurant Menu</h1>
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">Add Menu</h1>
             <p class="text-gray-600">Upload your menu photo and we'll extract the content using OCR technology.</p>
           </div>
           
           <div class="space-y-6">
             <div>
-              <label for="routeName" class="block text-sm font-medium text-gray-700 mb-1">Restaurant Name</label>
+              <label for="routeName" class="block text-sm font-medium text-gray-700 mb-1">Name of Place</label>
               <input 
                 id="routeName" 
                 type="text" 
@@ -321,7 +325,7 @@
             </div>
             
             <div class="space-y-2">
-              <label class="block text-sm font-medium text-gray-700 mb-1">Menu Photo</label>
+              <label for="mainPhoto" class="block text-sm font-medium text-gray-700 mb-1">Menu Photo</label>
               <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:bg-gray-50 transition-colors">
                 <input 
                   id="mainPhoto" 
@@ -431,19 +435,7 @@
               </div>
             {/if}
             
-            <div>
-              <label for="Description" class="block text-sm font-medium text-gray-700 mb-1">Menu Description</label>
-              <textarea 
-                id="Description" 
-                bind:value={Description} 
-                rows="5" 
-                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                placeholder="Enter menu description or let OCR extract it automatically"
-              ></textarea>
-              {#if ocrData}
-                <p class="text-xs text-green-600 mt-1"> Menu text extracted with OCR</p>
-              {/if}
-            </div>
+
             
             {#if ocrResult}
               <div class="ocr-results">
@@ -603,18 +595,6 @@
 </div>
 
 <style>
-  .debug-info {
-    margin-top: 20px;
-    padding: 10px;
-    border: 1px solid #ddd;
-    border-radius: 5px;
-    background-color: #f9f9f9;
-  }
-  
-  .debug-content {
-    padding: 10px;
-  }
-  
   .menu-item-box {
     background-color: white;
     border: 1px solid #e5e7eb;
