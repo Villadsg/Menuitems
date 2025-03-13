@@ -204,7 +204,7 @@ const findLocationAndSortItems = async () => {
   {:else}
     <!-- Menu items list -->
     {#if allMenuItems.length > 0}
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+      <div class="grid grid-cols-1 gap-4 mb-8 max-w-2xl mx-auto">
         {#each allMenuItems as menuItem}
           <div class="bg-white rounded-lg shadow border border-gray-200 hover:shadow-md transition-shadow overflow-hidden">
             <!-- Item header (always visible) -->
