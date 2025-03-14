@@ -15,9 +15,9 @@ export interface MenuOCRResult {
 }
 
 export class OCRService {
-  // Support both Netlify and Vercel serverless functions for Mistral OCR API
-  private static netlifyOcrUrl = '/.netlify/functions/mistral-ocr';
-  private static vercelOcrUrl = '/api/mistral-ocr';
+  // Support both Netlify and Vercel serverless functions for OCR API
+  private static netlifyOcrUrl = '/.netlify/functions/ocr-service';
+  private static vercelOcrUrl = '/api/ocr-service';
   
   /**
    * Get the appropriate OCR URL based on the deployment environment
@@ -33,7 +33,7 @@ export class OCRService {
   }
   
   /**
-   * Process an image with Mistral OCR to extract menu text
+   * Process an image with OCR to extract menu text
    * @param imageFileId The Appwrite storage file ID
    * @param bucketId The Appwrite storage bucket ID
    * @returns Processed menu text data
@@ -49,9 +49,9 @@ export class OCRService {
       const fileUrlWithTimestamp = `${fileUrl}&timestamp=${timestamp}`;
       console.log('File URL with timestamp:', fileUrlWithTimestamp);
       
-      // Call our serverless function for Mistral OCR
+      // Call our serverless function for OCR
       const ocrUrl = this.getOcrUrl();
-      console.log('Calling Mistral OCR serverless function at:', ocrUrl);
+      console.log('Calling OCR serverless function at:', ocrUrl);
       const response = await fetch(ocrUrl, {
         method: 'POST',
         headers: {
@@ -88,12 +88,12 @@ export class OCRService {
       }
       
       const data = await response.json();
-      console.log('Mistral OCR API response:', data);
+      console.log('OCR API response:', data);
       
-      // Extract text specifically from Mistral OCR response format
+      // Extract text from OCR response format
       let rawText = '';
       
-      // Check if the response contains the standard Mistral OCR format with pages array
+      // Check if the response contains the standard format with pages array
       if (data.pages && Array.isArray(data.pages)) {
         console.log('Found pages array with', data.pages.length, 'pages');
         
@@ -159,7 +159,7 @@ export class OCRService {
         menuItems,
         enhancedStructure: enhancedMenuStructure,
         debug: {
-          model: data.model || 'mistral-ocr-latest',
+          model: data.model || 'ocr-latest',
           textLength: rawText.length,
           extractedItems: menuItems.length,
           processingTimeMs: data.processingTimeMs || 0,
@@ -186,7 +186,7 @@ export class OCRService {
         } else if (error.message.includes('service is temporarily unavailable') || 
                   error.message.includes('status code 503') || 
                   error.message.includes('unavailable')) {
-          userMessage = 'The Mistral OCR service is temporarily unavailable. Please try again later.';
+          userMessage = 'The OCR service is temporarily unavailable. Please try again later.';
         }
       }
       

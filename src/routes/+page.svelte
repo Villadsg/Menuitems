@@ -124,7 +124,7 @@
       <div class="hero-overlay bg-black bg-opacity-50"></div>
       <div class="hero-content text-center text-neutral-content">
         <div class="max-w-md">
-          <h1 class="text-5xl font-bold mb-4">See all menus on one page</h1>
+          <h1 class="text-5xl font-bold mb-4">Menu content near you</h1>
           <p class="text-xl mb-8">Browse and compare menu content from places around you</p>
           <div class="flex flex-col space-y-4">
             <a href="/find-quiz">
