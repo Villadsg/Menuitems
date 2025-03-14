@@ -24,10 +24,21 @@ export class OCRService {
    * @returns The OCR API URL
    */
   private static getOcrUrl(): string {
+    // Check if we're in a development environment
+    const isDevelopment = typeof window !== 'undefined' && 
+                         (window.location.hostname === 'localhost' || 
+                          window.location.hostname === '127.0.0.1');
+    
     // Check if we're on Vercel by looking for the vercel.app domain
     const isVercel = typeof window !== 'undefined' && 
                     (window.location.hostname.includes('vercel.app') || 
                      window.location.hostname.includes('vercel-analytics'));
+    
+    // For local development, use the API route instead of the serverless function
+    if (isDevelopment) {
+      console.log('Using local development OCR endpoint');
+      return '/api/mistral-ocr';
+    }
     
     return isVercel ? this.vercelOcrUrl : this.netlifyOcrUrl;
   }
@@ -66,20 +77,32 @@ export class OCRService {
       
       if (!response.ok) {
         let errorData;
+        // Clone the response before reading it to avoid the 'body stream already read' error
+        const responseClone = response.clone();
+        
         try {
           // Try to parse the error response as JSON
           errorData = await response.json();
           console.error('OCR API error:', errorData);
         } catch (parseError) {
-          // If the response is not valid JSON, get the text instead
-          const errorText = await response.text();
-          console.error('OCR API error (non-JSON):', errorText);
-          
-          // Create a structured error object from the text
-          errorData = {
-            error: 'Failed to parse error response',
-            message: errorText.substring(0, 100) // Only include the first 100 chars to avoid huge errors
-          };
+          // If the response is not valid JSON, get the text from the cloned response
+          try {
+            const errorText = await responseClone.text();
+            console.error('OCR API error (non-JSON):', errorText);
+            
+            // Create a structured error object from the text
+            errorData = {
+              error: 'Failed to parse error response',
+              message: errorText.substring(0, 100) // Only include the first 100 chars to avoid huge errors
+            };
+          } catch (textError) {
+            // If both attempts fail, create a generic error object
+            errorData = {
+              error: 'Failed to read error response',
+              message: `Status: ${response.status} ${response.statusText}`
+            };
+            console.error('Failed to read error response:', textError);
+          }
         }
         
         // Throw a more descriptive error

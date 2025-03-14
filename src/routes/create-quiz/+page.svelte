@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { databases, storage, ID, Permission, Role, Query } from '$lib/appwrite'; 
+  import { databases, storage, ID, Permission, Role } from '$lib/appwrite'; 
   import { goto } from '$app/navigation';
   import { user } from '$lib/userStore';
   import { fly, fade } from 'svelte/transition';
@@ -12,7 +12,7 @@
   import Card from '$lib/components/Card.svelte';
   import Input from '$lib/components/Input.svelte';
   import { OCRService } from '$lib/ocrService'; // Import OCR service
-  // No longer need CryptoJS as we'll use Appwrite's built-in signature
+import type { MenuOCRResult } from '$lib/ocrService'; // Import type
  
   let routeName = '';
   let lat = '';
@@ -27,7 +27,7 @@
   let compressedFile: File | null = null;
   let photoPreviewUrl: string | null = null;
   let ocrProcessing = false;
-  let ocrResult = null;
+  let ocrResult: MenuOCRResult | null = null;
   let ocrError = null;
   let isProcessing = false;
 
@@ -113,8 +113,8 @@
         fileToUpload,
         [
           Permission.read(Role.any()),
-          Permission.update(Role.user(userId)),
-          Permission.delete(Role.user(userId))
+          Permission.update(Role.any()),
+          Permission.delete(Role.any())
         ]
       );
       
@@ -179,113 +179,6 @@
     }
   };
 
-  /**
-   * Find duplicate images in the Appwrite bucket based on file signature (MD5 hash)
-   * @param file The file to check for duplicates
-   * @returns The fileId of the duplicate if found, null otherwise
-   */
-  const findDuplicateImage = async (file: File): Promise<string | null> => {
-    try {
-      // Calculate MD5 hash of the file (this is done client-side before upload)
-      // We'll use this to check if a file with the same signature already exists
-      
-      // First, get a list of all files in the bucket
-      // We'll limit to 100 files for performance, adjust as needed
-      const filesList = await storage.listFiles(
-        bucketId,
-        [Query.limit(100)]
-      );
-      
-      // Check if there are any files in the bucket
-      if (!filesList || !filesList.files || filesList.files.length === 0) {
-        console.log('No files in bucket to check for duplicates');
-        return null;
-      }
-      
-      // Get file size to compare with existing files
-      const fileSize = file.size;
-      const fileName = file.name;
-      
-      // Log for debugging
-      console.log(`Checking for duplicates of ${fileName} (${fileSize} bytes)`);
-      
-      // Look for files with similar properties
-      for (const existingFile of filesList.files) {
-        // Check if the file has similar properties (size within 5% difference)
-        const sizeDifference = Math.abs(existingFile.sizeOriginal - fileSize);
-        const sizeThreshold = fileSize * 0.05; // 5% threshold
-        
-        if (sizeDifference <= sizeThreshold) {
-          console.log(`Found potential duplicate: ${existingFile.$id} with similar size`);
-          
-          // We found a potential duplicate based on size
-          // We'll use this file ID to avoid uploading a duplicate
-          return existingFile.$id;
-        }
-      }
-      
-      return null;
-    } catch (error) {
-      console.error('Error checking for duplicate images:', error);
-      return null;
-    }
-  };
-  
-  /**
-   * Delete duplicate menu photos from the bucket
-   * This function will be called after a successful upload to clean up any other duplicates
-   * @param currentFileId The ID of the file we just uploaded and want to keep
-   * @param fileSize The size of the file we want to keep
-   */
-  const cleanupDuplicateMenuPhotos = async (currentFileId: string, fileSize: number): Promise<void> => {
-    try {
-      // Get all files in the bucket
-      const filesList = await storage.listFiles(
-        bucketId,
-        [Query.limit(100)]
-      );
-      
-      if (!filesList || !filesList.files || filesList.files.length <= 1) {
-        // No need to check if there's only one file or none
-        return;
-      }
-      
-      // Find the file we just uploaded to get its details
-      const currentFile = filesList.files.find(file => file.$id === currentFileId);
-      if (!currentFile) {
-        console.warn('Could not find current file in bucket, skipping duplicate cleanup');
-        return;
-      }
-      
-      // Get the files that are potential duplicates (similar size, not the current file)
-      const potentialDuplicates = filesList.files.filter(file => {
-        // Skip the current file
-        if (file.$id === currentFileId) return false;
-        
-        // Check if the file has similar size (within 5% difference)
-        const sizeDifference = Math.abs(file.sizeOriginal - fileSize);
-        const sizeThreshold = fileSize * 0.05; // 5% threshold
-        
-        return sizeDifference <= sizeThreshold;
-      });
-      
-      console.log(`Found ${potentialDuplicates.length} potential duplicate menu photos to clean up`);
-      
-      // Delete the duplicate files
-      for (const duplicate of potentialDuplicates) {
-        try {
-          await storage.deleteFile(bucketId, duplicate.$id);
-          console.log(`Deleted duplicate menu photo: ${duplicate.$id}`);
-          toasts.success('Deleted duplicate menu photo to save storage space');
-        } catch (deleteError) {
-          console.error(`Failed to delete duplicate file ${duplicate.$id}:`, deleteError);
-        }
-      }
-    } catch (error) {
-      console.error('Error cleaning up duplicate menu photos:', error);
-    }
-  };
-
   /** Function to upload the main photo */
   const uploadMainPhoto = async () => {
     if (!compressedFile && !filesMainPhoto?.[0]) {
@@ -301,41 +194,30 @@
     }
     
     try {
-      // Check if a duplicate exists based on file properties
-      const duplicateFileId = await findDuplicateImage(fileToUpload);
-      
-      if (duplicateFileId) {
-        console.log('Using existing file instead of uploading duplicate:', duplicateFileId);
-        toasts.info('A similar menu photo already exists. Using the existing photo to save storage space.');
-        return duplicateFileId;
-      }
-      
       // Create a unique file ID
       const fileId = ID.unique();
       
-      // Upload the file to Appwrite Storage with hash metadata
+      // Upload the file to Appwrite Storage
       const response = await storage.createFile(
         bucketId,
         fileId,
         fileToUpload,
         [
           Permission.read(Role.any()),
-          Permission.update(Role.user(userId)),
-          Permission.delete(Role.user(userId))
+          Permission.update(Role.any()),
+          Permission.delete(Role.any())
         ],
         (progress) => {
-          uploadProgress = Math.round(progress);
+          // Convert UploadProgress to number by accessing the progress property
+          uploadProgress = Math.round((progress as any).progress || 0);
         }
       );
       
-      // After successful upload, clean up any other duplicate menu photos
-      await cleanupDuplicateMenuPhotos(fileId, fileToUpload.size);
-      
       console.log('File uploaded successfully:', response);
       return fileId;
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error uploading file:', error);
-      toasts.error('Error uploading file: ' + error.message);
+      toasts.error('Error uploading file: ' + (error instanceof Error ? error.message : 'Unknown error'));
       return null;
     }
   };
@@ -365,7 +247,7 @@
       // Add OCR data if available
       if (ocrResult && ocrResult.menuItems) {
         // Format menu items to ensure they're separatable
-        const structuredMenuItems = ocrResult.menuItems.map(item => ({
+        const structuredMenuItems = ocrResult.menuItems.map((item: { name?: string; description?: string; price?: string; category?: string; }) => ({
           name: item.name || '',
           description: item.description || '',
           price: item.price || '',
@@ -383,8 +265,8 @@
         documentData,
         [
           Permission.read(Role.any()),
-          Permission.update(Role.user(userId)),
-          Permission.delete(Role.user(userId))
+          Permission.update(Role.any()),
+          Permission.delete(Role.any())
         ]
       );
       
@@ -396,9 +278,9 @@
       setTimeout(() => {
         goto('/');
       }, 2000);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error creating document:', error);
-      toasts.error('Error saving menu: ' + error.message);
+      toasts.error('Error saving menu: ' + (error instanceof Error ? error.message : 'Unknown error'));
     } finally {
       loading = false;
     }
@@ -413,8 +295,8 @@
       lng = location.longitude.toString();
       toasts.success('Location retrieved successfully');
       loading = false;
-    } catch (error) {
-      console.error('Error getting location:', error.message);
+    } catch (error: unknown) {
+      console.error('Error getting location:', error instanceof Error ? error.message : 'Unknown error');
       toasts.error('Could not retrieve your location');
       loading = false;
     }
