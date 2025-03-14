@@ -24,81 +24,23 @@ export class OCRService {
    * @returns The OCR API URL
    */
   private static getOcrUrl(): string {
+    // Check if we're in a development environment
+    const isDevelopment = typeof window !== 'undefined' && 
+                         (window.location.hostname === 'localhost' || 
+                          window.location.hostname === '127.0.0.1');
+    
     // Check if we're on Vercel by looking for the vercel.app domain
     const isVercel = typeof window !== 'undefined' && 
                     (window.location.hostname.includes('vercel.app') || 
                      window.location.hostname.includes('vercel-analytics'));
     
-    // Check if we're in local development (localhost or 127.0.0.1)
-    const isLocalDev = typeof window !== 'undefined' && 
-                      (window.location.hostname === 'localhost' || 
-                       window.location.hostname === '127.0.0.1');
-    
-    if (isLocalDev) {
-      // For local development, use a mock response or direct API call
-      console.log('Local development environment detected - using mock OCR or direct API');
-      // You can either:
-      // 1. Return a mock endpoint that's available locally
-      // 2. Return a direct API endpoint if you have CORS configured
-      // 3. Return the Netlify function URL but handle the 404 gracefully
-      
-      // For now, we'll still return the Netlify URL but handle the error gracefully in processMenuImage
-      return this.netlifyOcrUrl;
+    // For local development, use the API route instead of the serverless function
+    if (isDevelopment) {
+      console.log('Using local development OCR endpoint');
+      return '/api/mistral-ocr';
     }
     
     return isVercel ? this.vercelOcrUrl : this.netlifyOcrUrl;
-  }
-  
-  /**
-   * Generate mock OCR result for local development
-   * @param imageUrl The image URL (not used in mock, but included for consistency)
-   * @returns A mock OCR result with sample menu items
-   */
-  private static getMockOcrResult(imageUrl: string): MenuOCRResult {
-    console.log('Generating mock OCR result for local development');
-    
-    // Sample menu items that mimic real OCR output
-    const mockMenuItems = [
-      { name: "FATTO TIRAMISU", description: "Coffee liqueur soaked sponge, mascarpone, chocolate", price: "7", category: "Desserts" },
-      { name: "SCUGNIZIELLI NUTELLA & GELATO", description: "Fried mini pizza doughnuts, Nutella, vanilla gelato", price: "7.5", category: "Desserts" },
-      { name: "AFFOGATO", description: "Vanilla gelato, espresso", price: "6", category: "Desserts" },
-      { name: "AFFOGATO LIMONCELLO", description: "Lemon sorbet, limoncello", price: "7.5", category: "Desserts" },
-      { name: "LEMON MERINGUE", description: "Vanilla biscuit filled with vanilla gelato, lemon curd & meringue", price: "7", category: "Desserts" },
-      { name: "CHOCOLATE SALTED CARAMEL", description: "Chocolate dipped biscuit filled with salted caramel gelato", price: "7", category: "Desserts" },
-      { name: "LIMONCELLO 35ml", description: "", price: "4", category: "Digestivo" },
-      { name: "CREMA DI PISTACHIO 35ml", description: "", price: "4", category: "Digestivo" },
-      { name: "ESPRESSO", description: "", price: "2.5", category: "Coffee" },
-      { name: "MACCHIATO", description: "", price: "2.5", category: "Coffee" }
-    ];
-    
-    // Generate raw text from the mock menu items
-    const rawText = mockMenuItems.map(item => {
-      let text = `${item.name}`;
-      if (item.price) text += ` - ${item.price}`;
-      if (item.description) text += `\n${item.description}`;
-      return text;
-    }).join('\n\n');
-    
-    return {
-      menuItems: mockMenuItems,
-      rawText,
-      enhancedStructure: {
-        sections: [
-          { name: "Desserts", items: mockMenuItems.filter(item => item.category === "Desserts") },
-          { name: "Digestivo", items: mockMenuItems.filter(item => item.category === "Digestivo") },
-          { name: "Coffee", items: mockMenuItems.filter(item => item.category === "Coffee") }
-        ],
-        metadata: {
-          totalItems: mockMenuItems.length,
-          totalSections: 3,
-          createdAt: new Date().toISOString()
-        }
-      },
-      debug: {
-        source: "mock_data",
-        imageUrl
-      }
-    };
   }
   
   /**
@@ -118,17 +60,6 @@ export class OCRService {
       const fileUrlWithTimestamp = `${fileUrl}&timestamp=${timestamp}`;
       console.log('File URL with timestamp:', fileUrlWithTimestamp);
       
-      // Check if we're in local development (localhost or 127.0.0.1)
-      const isLocalDev = typeof window !== 'undefined' && 
-                        (window.location.hostname === 'localhost' || 
-                         window.location.hostname === '127.0.0.1');
-      
-      if (isLocalDev) {
-        console.log('Local development environment detected - using mock OCR data');
-        // Return mock OCR result for local development
-        return this.getMockOcrResult(fileUrlWithTimestamp);
-      }
-      
       // Call our serverless function for Mistral OCR
       const ocrUrl = this.getOcrUrl();
       console.log('Calling Mistral OCR serverless function at:', ocrUrl);
@@ -145,31 +76,33 @@ export class OCRService {
       console.log('Response status:', response.status);
       
       if (!response.ok) {
-        // Check if we're in local development and got a 404 error
-        const isLocalDev = typeof window !== 'undefined' && 
-                          (window.location.hostname === 'localhost' || 
-                           window.location.hostname === '127.0.0.1');
-        
-        if (isLocalDev && response.status === 404) {
-          console.log('404 error in local development - falling back to mock OCR data');
-          return this.getMockOcrResult(fileUrlWithTimestamp);
-        }
-        
         let errorData;
+        // Clone the response before reading it to avoid the 'body stream already read' error
+        const responseClone = response.clone();
+        
         try {
           // Try to parse the error response as JSON
           errorData = await response.json();
           console.error('OCR API error:', errorData);
         } catch (parseError) {
-          // If the response is not valid JSON, get the text instead
-          const errorText = await response.text();
-          console.error('OCR API error (non-JSON):', errorText);
-          
-          // Create a structured error object from the text
-          errorData = {
-            error: 'Failed to parse error response',
-            message: errorText.substring(0, 100) // Only include the first 100 chars to avoid huge errors
-          };
+          // If the response is not valid JSON, get the text from the cloned response
+          try {
+            const errorText = await responseClone.text();
+            console.error('OCR API error (non-JSON):', errorText);
+            
+            // Create a structured error object from the text
+            errorData = {
+              error: 'Failed to parse error response',
+              message: errorText.substring(0, 100) // Only include the first 100 chars to avoid huge errors
+            };
+          } catch (textError) {
+            // If both attempts fail, create a generic error object
+            errorData = {
+              error: 'Failed to read error response',
+              message: `Status: ${response.status} ${response.statusText}`
+            };
+            console.error('Failed to read error response:', textError);
+          }
         }
         
         // Throw a more descriptive error
