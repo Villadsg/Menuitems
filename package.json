@@ -3,8 +3,8 @@
 	"version": "0.0.1",
 	"private": true,
 	"engines": {
-    "node": "20.x"
-  },
+		"node": "20.x"
+	},
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build",
@@ -42,9 +42,11 @@
 	"dependencies": {
 		"@deck.gl/core": "^9.0.36",
 		"@deck.gl/layers": "^9.0.36",
+		"@types/crypto-js": "^4.2.2",
 		"appwrite": "^15.0.0",
 		"axios": "^1.6.7",
 		"browser-image-compression": "^2.0.2",
+		"crypto-js": "^4.2.0",
 		"daisyui": "^4.12.10",
 		"deepl-node": "^1.14.0",
 		"exifr": "^7.1.3",
