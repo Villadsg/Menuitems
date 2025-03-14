@@ -28,7 +28,16 @@ export const POST: RequestHandler = async ({ request }) => {
     const systemPrompt = `
       You are a specialized menu structure analyzer. Your task is to analyze OCR text from restaurant menus and extract structured information.
       
-      For each menu section or category:
+      First, try to identify the restaurant name. Be very flexible and consider any of these clues:
+      - Text at the top of the menu (especially in the first few lines)
+      - Text that appears to be a brand, business, or establishment name
+      - Words like "Restaurant", "Cafe", "Bar", "Bistro", "Ristorante", "Trattoria", etc.
+      - Distinctive or unique names that don't match common menu section names
+      - Names that appear in a logo-like format or with special formatting
+      - Names that appear multiple times throughout the menu
+      - Names that appear alongside an address, phone number, or website
+      
+      Then, for each menu section or category:
       1. Identify section headings (typically in all caps, larger font, or followed by a list of items)
       2. For each menu item, extract:
          - Item name
@@ -37,6 +46,7 @@ export const POST: RequestHandler = async ({ request }) => {
       
       Format your response as a JSON object with the following structure:
       {
+        "restaurantName": "Name of the Restaurant",
         "menuSections": [
           {
             "sectionName": "APPETIZERS",
@@ -53,6 +63,7 @@ export const POST: RequestHandler = async ({ request }) => {
         ]
       }
       
+      If you cannot identify the restaurant name with high confidence, make your best guess based on any available clues. Look for distinctive words or phrases that could be part of a name. Even partial names are better than "Unknown Restaurant". If there are multiple possible names, include all of them separated by OR (e.g., "Luigi's OR Luigi's Pizza").
       If you cannot identify sections, use "Uncategorized" as the section name.
       If an item has no description, use an empty string.
       If an item has no price, use null.

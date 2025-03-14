@@ -123,6 +123,23 @@
       const ocrResultResponse = await OCRService.processMenuImage(fileId, bucketId);
       ocrResult = ocrResultResponse;
       
+      // Autofill restaurant name if available
+      if (ocrResultResponse && ocrResultResponse.restaurantName) {
+        // Check if we have a valid restaurant name
+        if (ocrResultResponse.restaurantName !== "Unknown Restaurant") {
+          // Handle multiple possible names (separated by OR)
+          if (ocrResultResponse.restaurantName.includes(" OR ")) {
+            const possibleNames = ocrResultResponse.restaurantName.split(" OR ");
+            // Use the first name as default
+            routeName = possibleNames[0].trim();
+            toasts.info(`Multiple possible restaurant names detected. Using "${routeName}"`);
+          } else {
+            routeName = ocrResultResponse.restaurantName;
+            toasts.info(`Restaurant name "${routeName}" detected from menu image`);
+          }
+        }
+      }
+      
       // Log OCR data for debugging
       if (ocrResultResponse && ocrResultResponse.rawText) {
         
@@ -444,6 +461,13 @@
                 required 
                 class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
               />
+              {#if ocrResult && ocrResult.restaurantName && ocrResult.restaurantName !== "Unknown Restaurant"}
+                {#if ocrResult.restaurantName.includes(" OR ")}
+                  <p class="text-xs text-blue-600 mt-1">Multiple possible names detected from menu</p>
+                {:else if routeName === ocrResult.restaurantName}
+                  <p class="text-xs text-green-600 mt-1">Name detected from menu image</p>
+                {/if}
+              {/if}
             </div>
             
             <div class="space-y-2">

@@ -9,6 +9,7 @@ export interface MenuOCRResult {
     price?: string;
     category?: string;
   }[];
+  restaurantName?: string;
   rawText: string;
   enhancedStructure?: any;
   debug?: any;
@@ -153,10 +154,29 @@ export class OCRService {
         console.log('Menu items extracted from basic processing:', menuItems.length);
       }
       
+      // Extract restaurant name from enhanced structure if available
+      let restaurantName = "Unknown Restaurant";
+      
+      // First try to get the name from the enhanced structure
+      if (enhancedMenuStructure && enhancedMenuStructure.restaurantName) {
+        restaurantName = enhancedMenuStructure.restaurantName;
+        console.log('Restaurant name from enhanced structure:', restaurantName);
+      }
+      
+      // If we couldn't get a name or got the default, try to extract it from the raw text
+      if (restaurantName === "Unknown Restaurant" || restaurantName.includes("OR")) {
+        const extractedName = this.extractRestaurantNameFromRawText(rawText);
+        if (extractedName) {
+          restaurantName = extractedName;
+          console.log('Restaurant name extracted from raw text:', restaurantName);
+        }
+      }
+      
       // Create the OCR result
       const ocrResult: MenuOCRResult = {
         rawText,
         menuItems,
+        restaurantName,
         enhancedStructure: enhancedMenuStructure,
         debug: {
           model: data.model || 'ocr-latest',
@@ -380,6 +400,97 @@ export class OCRService {
    * @param menuItems The menu items to structure
    * @returns A structured format with sections and items
    */
+  /**
+   * Attempt to extract a restaurant name from raw OCR text using heuristics
+   * @param rawText The raw OCR text from the menu
+   * @returns A potential restaurant name or null if none found
+   */
+  private static extractRestaurantNameFromRawText(rawText: string): string | null {
+    if (!rawText || rawText.length < 5) return null;
+    
+    // Split the text into lines and clean them
+    const lines = rawText.split('\n')
+      .map(line => line.trim())
+      .filter(line => line.length > 0);
+    
+    if (lines.length === 0) return null;
+    
+    // Common menu section names to avoid mistaking for restaurant names
+    const commonSectionNames = [
+      'menu', 'appetizers', 'starters', 'entrees', 'main', 'mains', 'desserts', 
+      'drinks', 'beverages', 'sides', 'lunch', 'dinner', 'breakfast', 'brunch',
+      'specials', 'special', 'daily', 'soup', 'salad', 'pasta', 'pizza', 'wine',
+      'beer', 'cocktails', 'kids', 'children', 'takeout', 'take-out', 'to go',
+      'vegetarian', 'vegan', 'gluten-free', 'allergens', 'snacks'
+    ];
+    
+    // Check the first few lines for potential restaurant names
+    // Focus on the first 5 lines as restaurant names often appear at the top
+    for (let i = 0; i < Math.min(5, lines.length); i++) {
+      const line = lines[i];
+      
+      // Skip very short lines or common section names
+      if (line.length < 3 || commonSectionNames.some(section => 
+          line.toLowerCase().includes(section))) {
+        continue;
+      }
+      
+      // Look for lines that might be restaurant names
+      // 1. All caps or title case often indicates importance
+      // 2. Contains words like Restaurant, Cafe, etc.
+      // 3. Not too long (most restaurant names are reasonably short)
+      if (
+        (line === line.toUpperCase() || 
+         (line[0] === line[0].toUpperCase() && line.length > 3)) && 
+        line.length < 40 &&
+        !line.includes('$') && // Avoid price lists
+        !line.match(/^\d/) // Avoid lines starting with numbers
+      ) {
+        return line;
+      }
+      
+      // Check for lines containing restaurant-related words
+      const restaurantWords = ['restaurant', 'cafe', 'bistro', 'bar', 'grill', 
+                              'ristorante', 'trattoria', 'pizzeria', 'kitchen',
+                              'eatery', 'diner', 'steakhouse', 'pub', 'tavern'];
+      
+      if (restaurantWords.some(word => line.toLowerCase().includes(word))) {
+        return line;
+      }
+    }
+    
+    // If we couldn't find anything in the first few lines, look for distinctive patterns
+    // throughout the text that might indicate a restaurant name
+    
+    // Look for lines with "est." or "established" which often appear with restaurant names
+    const establishedLine = lines.find(line => 
+      line.toLowerCase().includes('est.') || 
+      line.toLowerCase().includes('established') ||
+      line.toLowerCase().includes('since'));
+    
+    if (establishedLine) {
+      // Extract the part before "est." or "established"
+      const parts = establishedLine.split(/est\.|established|since/i);
+      if (parts.length > 0 && parts[0].trim().length > 0) {
+        return parts[0].trim();
+      }
+    }
+    
+    // As a last resort, return the first line that's not a common menu section
+    // and looks like it could be a name
+    for (const line of lines) {
+      if (line.length > 3 && 
+          line.length < 40 && 
+          !commonSectionNames.some(section => line.toLowerCase() === section) &&
+          !line.includes('$') &&
+          !line.match(/^\d/)) {
+        return line;
+      }
+    }
+    
+    return null;
+  }
+  
   private static createStructuredMenuItems(menuItems: MenuOCRResult['menuItems']): any {
     // Group menu items by category
     const categorizedItems: Record<string, any[]> = {};
