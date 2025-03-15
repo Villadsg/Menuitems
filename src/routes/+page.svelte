@@ -120,7 +120,7 @@
     </div>
   {:else}
     <!-- Hero Section -->
-    <div class="hero min-h-screen" style="background-image: url('/baggie4.jpg');">
+    <div class="hero min-h-screen" style="background-image: url('/baggie4.jpeg');">
       <div class="hero-overlay bg-black bg-opacity-50"></div>
       <div class="hero-content text-center text-neutral-content">
         <div class="max-w-md">
