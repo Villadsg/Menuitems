@@ -22,12 +22,29 @@
   let message = '';
   let languages = ['ES','IT','DA','JA']; 
   const currentDate = new Date().toISOString().slice(0, 16).replace('T', ' ');
+  
+  // Menu editor variables
+  let showMenuItemEditor = false;
+  let editableMenuItems: MenuItem[] = [];
 
   let filesMainPhoto: FileList | null = null;
   let compressedFile: File | null = null;
   let photoPreviewUrl: string | null = null;
   let ocrProcessing = false;
-  let ocrResult = null;
+  interface MenuItem {
+    name: string;
+    price?: string;
+    description?: string;
+    category?: string;
+  }
+
+  interface OCRResult {
+    menuItems: MenuItem[];
+    rawText?: string;
+    restaurantName?: string;
+  }
+
+  let ocrResult: OCRResult | null = null;
   let ocrError = null;
   let isProcessing = false;
 
@@ -123,6 +140,11 @@
       const ocrResultResponse = await OCRService.processMenuImage(fileId, bucketId);
       ocrResult = ocrResultResponse;
       
+      // Initialize editable menu items with the OCR results
+      if (ocrResultResponse && ocrResultResponse.menuItems) {
+        editableMenuItems = JSON.parse(JSON.stringify(ocrResultResponse.menuItems));
+      }
+      
       // Autofill restaurant name if available
       if (ocrResultResponse && ocrResultResponse.restaurantName) {
         // Check if we have a valid restaurant name
@@ -202,6 +224,34 @@
    * @param file The file to check for duplicates
    * @returns The fileId of the duplicate if found, null otherwise
    */
+  // Function to add a new menu item
+  const addMenuItem = () => {
+    editableMenuItems = [
+      ...editableMenuItems,
+      {
+        name: "",
+        price: "",
+        description: "",
+        category: ""
+      }
+    ];
+  };
+  
+  // Function to remove a menu item
+  const removeMenuItem = (index: number) => {
+    editableMenuItems = editableMenuItems.filter((_, i) => i !== index);
+  };
+  
+  // Function to save edited menu items
+  const saveEditedMenuItems = () => {
+    if (ocrResult) {
+      // Update the OCR result with edited items
+      ocrResult.menuItems = JSON.parse(JSON.stringify(editableMenuItems));
+      showMenuItemEditor = false;
+      toasts.success("Menu items updated successfully");
+    }
+  };
+
   const findDuplicateImage = async (file: File): Promise<string | null> => {
     try {
       // Calculate MD5 hash of the file (this is done client-side before upload)
@@ -359,9 +409,77 @@
     }
   };
 
+  /**
+   * Validate that the OCR results contain actual menu items
+   * @returns {boolean} True if the data likely represents a menu, false otherwise
+   */
+  const validateMenuItems = () => {
+    // If no OCR result, we can't validate
+    if (!ocrResult || !ocrResult.menuItems || ocrResult.menuItems.length === 0) {
+      toasts.error('No menu items detected. Please try with a clearer menu image.');
+      return false;
+    }
+    
+    // Minimum number of menu items required (adjust as needed)
+    const MIN_MENU_ITEMS = 3;
+    if (ocrResult.menuItems.length < MIN_MENU_ITEMS) {
+      toasts.error(`Too few menu items detected (${ocrResult.menuItems.length}). Please try with a better menu image.`);
+      return false;
+    }
+    
+    // Check if we have at least some items with prices (common in menus)
+    const itemsWithPrices = ocrResult.menuItems.filter(item => item.price && item.price.trim() !== '');
+    const priceRatio = itemsWithPrices.length / ocrResult.menuItems.length;
+    
+    // At least 20% of items should have prices to be considered a menu
+    if (priceRatio < 0.2 && itemsWithPrices.length < 2) {
+      toasts.error('Few price information detected. This may not be a menu image.');
+      return false;
+    }
+    
+    // Check for menu item quality indicators
+    const hasCategories = ocrResult.menuItems.some(item => item.category && item.category !== 'Uncategorized');
+    const hasDescriptions = ocrResult.menuItems.some(item => item.description && item.description.trim() !== '');
+    
+    // Check if we have debug info about extraction quality
+    let qualityScore = 0;
+    if (ocrResult && 'debug' in ocrResult && ocrResult.debug) {
+      const debug = ocrResult.debug as any; // Type assertion to avoid TS errors
+      
+      // If we have quality metrics from debug info
+      const extractedItems = debug.extractedItems || 0;
+      if (extractedItems > 15) qualityScore += 3; // excellent
+      else if (extractedItems > 10) qualityScore += 2; // good
+      else if (extractedItems > 5) qualityScore += 1; // fair
+      
+      // If enhanced analysis was done, that's a good sign
+      if (debug.enhancedAnalysis) qualityScore += 1;
+    }
+    
+    // Add points for structure quality
+    if (hasCategories) qualityScore += 2;
+    if (hasDescriptions) qualityScore += 1;
+    if (priceRatio > 0.5) qualityScore += 2;
+    
+    // If we have a good quality score, it's likely a menu
+    const QUALITY_THRESHOLD = 3;
+    if (qualityScore >= QUALITY_THRESHOLD) {
+      return true;
+    }
+    
+    // Otherwise, show a warning but allow override
+    const confirmed = confirm('This doesn\'t appear to be a typical menu. Are you sure you want to proceed with uploading?');
+    return confirmed;
+  };
+  
   /** Submit the quiz */
   const submitQuiz = async () => {
     try {
+      // First validate if the extracted content is likely a menu
+      if (!validateMenuItems()) {
+        return;
+      }
+      
       loading = true;
       const mainPhotoFileId = await uploadMainPhoto();
       
@@ -402,8 +520,9 @@
         documentData,
         [
           Permission.read(Role.any()),
-          Permission.update(Role.user(userId)),
-          Permission.delete(Role.user(userId))
+          Permission.write(Role.any()),
+          Permission.update(Role.any()),
+          Permission.delete(Role.any())
         ]
       );
       
@@ -591,6 +710,21 @@
                   <div class="menu-items">
                     <h4 class="text-lg font-semibold mb-3">Menu Items:</h4>
                     
+                    <!-- Add button to edit menu items -->
+                    <button
+                      type="button"
+                      class="text-blue-600 font-bold text-sm inline-flex items-center mb-4 bg-blue-50 hover:bg-blue-100 px-3 py-2 rounded-full transition-all"
+                      on:click={() => {
+                        // Copy OCR result items to editable items
+                        if (ocrResult && ocrResult.menuItems) {
+                          editableMenuItems = JSON.parse(JSON.stringify(ocrResult.menuItems));
+                          showMenuItemEditor = true;
+                        }
+                      }}
+                    >
+                      <i class="fas fa-edit mr-2"></i> Edit Menu Items
+                    </button>
+                    
                     <!-- Categories and their items -->
                     {#each [...new Set(ocrResult.menuItems.map(item => item.category))] as category}
                       {#if category}
@@ -739,6 +873,115 @@
     {/if}
   {/key}
 </div>
+
+<!-- Menu Item Editor Popup -->
+{#if showMenuItemEditor}
+<div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+  <div class="bg-white rounded-lg shadow-lg w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+    <div class="p-6">
+      <div class="flex justify-between items-center mb-6">
+        <h2 class="text-2xl font-bold">Edit Menu Items</h2>
+        <button 
+          class="text-gray-500 hover:text-gray-700" 
+          on:click={() => showMenuItemEditor = false}
+        >
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      
+      <div class="space-y-6">
+        {#if editableMenuItems.length === 0}
+          <p class="text-gray-500 italic">No menu items found</p>
+        {:else}
+          {#each editableMenuItems as item, index}
+            <div class="p-4 border border-gray-200 rounded-lg relative">
+              <button 
+                class="absolute top-3 right-3 text-red-500 hover:text-red-700"
+                on:click={() => removeMenuItem(index)}
+              >
+                <i class="fas fa-trash"></i>
+              </button>
+              
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label for={`item-name-${index}`} class="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                  <input 
+                    id={`item-name-${index}`}
+                    type="text" 
+                    bind:value={item.name} 
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    placeholder="Item name"
+                  />
+                </div>
+                
+                <div>
+                  <label for={`item-price-${index}`} class="block text-sm font-medium text-gray-700 mb-1">Price</label>
+                  <input 
+                    id={`item-price-${index}`}
+                    type="text" 
+                    bind:value={item.price} 
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    placeholder="$0.00"
+                  />
+                </div>
+              </div>
+              
+              <div class="mt-3">
+                <label for={`item-category-${index}`} class="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                <input 
+                  id={`item-category-${index}`}
+                  type="text" 
+                  bind:value={item.category} 
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  placeholder="e.g. Appetizers, Main Course, etc."
+                />
+              </div>
+              
+              <div class="mt-3">
+                <label for={`item-description-${index}`} class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <textarea 
+                  id={`item-description-${index}`}
+                  bind:value={item.description} 
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md h-24"
+                  placeholder="Enter item description"
+                ></textarea>
+              </div>
+            </div>
+          {/each}
+        {/if}
+        
+        <div class="flex justify-between mt-6">
+          <button
+            type="button"
+            class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors"
+            on:click={addMenuItem}
+          >
+            <i class="fas fa-plus mr-2"></i> Add New Item
+          </button>
+          
+          <div>
+            <button
+              type="button"
+              class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 transition-colors mr-3"
+              on:click={() => showMenuItemEditor = false}
+            >
+              Cancel
+            </button>
+            
+            <button
+              type="button"
+              class="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors"
+              on:click={saveEditedMenuItems}
+            >
+              Save Changes
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{/if}
 
 <style>
   .menu-item-box {

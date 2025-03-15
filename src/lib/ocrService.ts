@@ -134,9 +134,15 @@ export class OCRService {
         console.warn('Could not find text in the response. Using empty string.');
       }
       
+      // Check if there's enough text to process
+      if (!rawText || rawText.trim().length < 20) {
+        console.warn('Insufficient text detected in the image. Cannot extract menu items.');
+        throw new Error('No menu text detected in the image. Please try with a clearer menu photo.');
+      }
+      
       // Try to use enhanced menu structure analysis
       let enhancedMenuStructure = null;
-      let menuItems;
+      let menuItems = [];
       
       try {
         // Call the new menu structure analysis
@@ -147,11 +153,21 @@ export class OCRService {
         // Convert the enhanced structure to menu items
         menuItems = this.convertEnhancedStructureToMenuItems(enhancedMenuStructure);
         console.log('Menu items extracted from enhanced structure:', menuItems.length);
+        
+        // If no menu items were extracted, throw an error
+        if (menuItems.length === 0) {
+          throw new Error('No menu items could be extracted from the image. Please try with a clearer menu photo.');
+        }
       } catch (analysisError) {
         console.error('Enhanced menu analysis failed, falling back to basic processing:', analysisError);
         // Fall back to basic processing if enhanced analysis fails
         menuItems = this.processMenuText(rawText);
         console.log('Menu items extracted from basic processing:', menuItems.length);
+        
+        // If basic processing also failed to extract menu items, throw an error
+        if (menuItems.length === 0) {
+          throw new Error('No menu items could be extracted from the image. Please try with a clearer menu photo.');
+        }
       }
       
       // Extract restaurant name from enhanced structure if available
@@ -228,7 +244,20 @@ export class OCRService {
    * @returns Structured menu items
    */
   private static processMenuText(text: string): MenuOCRResult['menuItems'] {
+    // If text is empty or too short (less than 20 chars), return empty array
+    if (!text || text.trim().length < 20) {
+      console.log('Insufficient text for menu item extraction, returning empty array');
+      return [];
+    }
+    
     const lines = text.split('\n').filter(line => line.trim());
+    
+    // If there are too few lines, it's probably not a menu
+    if (lines.length < 3) {
+      console.log('Too few lines for menu item extraction, returning empty array');
+      return [];
+    }
+    
     const menuItems: MenuOCRResult['menuItems'] = [];
     let currentCategory = 'Uncategorized';
     
@@ -369,6 +398,12 @@ export class OCRService {
    */
   private static convertEnhancedStructureToMenuItems(enhancedStructure: any): MenuOCRResult['menuItems'] {
     const menuItems: MenuOCRResult['menuItems'] = [];
+    
+    // Check if the structure is marked as not being a menu
+    if (enhancedStructure && enhancedStructure.isMenu === false) {
+      console.log('Text was not identified as a menu. Returning empty menu items.');
+      return [];
+    }
     
     if (enhancedStructure && enhancedStructure.menuSections) {
       for (const section of enhancedStructure.menuSections) {

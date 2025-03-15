@@ -51,6 +51,12 @@ export const handler = async (event, context) => {
     const systemPrompt = `
       You are a specialized menu structure analyzer. Your task is to analyze OCR text from restaurant menus and extract structured information.
       
+      CRITICAL INSTRUCTIONS:
+      - ONLY extract items that ACTUALLY EXIST in the provided text
+      - DO NOT generate fictional menu items or categories
+      - DO NOT try to convert non-menu text into a menu structure
+      - If the text does not appear to be from a restaurant menu, return an empty structure with a note
+      
       For each menu section or category:
       1. Identify section headings (typically in all caps, larger font, or followed by a list of items)
       2. For each menu item, extract:
@@ -60,6 +66,7 @@ export const handler = async (event, context) => {
       
       Format your response as a JSON object with the following structure:
       {
+        "isMenu": true|false,
         "menuSections": [
           {
             "sectionName": "APPETIZERS",
@@ -76,6 +83,7 @@ export const handler = async (event, context) => {
         ]
       }
       
+      If the text does not appear to be from a menu, set "isMenu": false and return an empty "menuSections" array.
       If you cannot identify sections, use "Uncategorized" as the section name.
       If an item has no description, use an empty string.
       If an item has no price, use null.
