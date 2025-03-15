@@ -423,7 +423,7 @@
     // Minimum number of menu items required (adjust as needed)
     const MIN_MENU_ITEMS = 3;
     if (ocrResult.menuItems.length < MIN_MENU_ITEMS) {
-      toasts.error(`Too few menu items detected (${ocrResult.menuItems.length}). Please try with a better menu image.`);
+      toasts.error(`What the f are you trying to upload? `);
       return false;
     }
     
