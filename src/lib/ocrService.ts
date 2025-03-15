@@ -143,6 +143,7 @@ export class OCRService {
       // Try to use enhanced menu structure analysis
       let enhancedMenuStructure = null;
       let menuItems = [];
+      let isMenuContent = true;
       
       try {
         // Call the new menu structure analysis
@@ -150,13 +151,30 @@ export class OCRService {
         enhancedMenuStructure = await this.analyzeMenuStructure(rawText);
         console.log('Enhanced menu structure:', enhancedMenuStructure);
         
-        // Convert the enhanced structure to menu items
-        menuItems = this.convertEnhancedStructureToMenuItems(enhancedMenuStructure);
-        console.log('Menu items extracted from enhanced structure:', menuItems.length);
+        // Check if the content was identified as a menu
+        if (enhancedMenuStructure && enhancedMenuStructure.isMenu === false) {
+          console.warn('Content was not identified as a menu. Using raw text instead.');
+          isMenuContent = false;
+          
+          // Create simple text items from the raw text
+          const lines = rawText.split('\n').filter(line => line.trim());
+          for (const line of lines) {
+            if (line.trim()) {
+              menuItems.push({
+                name: line.trim(),
+                category: 'Text Content'
+              });
+            }
+          }
+        } else {
+          // Convert the enhanced structure to menu items
+          menuItems = this.convertEnhancedStructureToMenuItems(enhancedMenuStructure);
+          console.log('Menu items extracted from enhanced structure:', menuItems.length);
+        }
         
-        // If no menu items were extracted, throw an error
+        // If no items were extracted at all, fall back to basic processing
         if (menuItems.length === 0) {
-          throw new Error('No menu items could be extracted from the image. Please try with a clearer menu photo.');
+          throw new Error('No content could be extracted from the image.');
         }
       } catch (analysisError) {
         console.error('Enhanced menu analysis failed, falling back to basic processing:', analysisError);
@@ -164,9 +182,9 @@ export class OCRService {
         menuItems = this.processMenuText(rawText);
         console.log('Menu items extracted from basic processing:', menuItems.length);
         
-        // If basic processing also failed to extract menu items, throw an error
+        // If basic processing also failed to extract any items, throw an error
         if (menuItems.length === 0) {
-          throw new Error('No menu items could be extracted from the image. Please try with a clearer menu photo.');
+          throw new Error('No content could be extracted from the image. Please try with a clearer photo.');
         }
       }
       
@@ -260,6 +278,7 @@ export class OCRService {
     
     const menuItems: MenuOCRResult['menuItems'] = [];
     let currentCategory = 'Uncategorized';
+    let priceCount = 0;
     
     for (const line of lines) {
       // Look for price patterns (e.g., $12.99)
@@ -285,12 +304,31 @@ export class OCRService {
           description,
           category: currentCategory
         });
+        priceCount++;
       } else if (line.trim()) {
         // This could be a menu item without a price or a description
         menuItems.push({
           name: line.trim(),
           category: currentCategory
         });
+      }
+    }
+    
+    // If we didn't find any prices and there are more than 10 lines,
+    // this probably isn't a menu. In this case, just create items from the lines
+    // without trying to categorize them.
+    if (priceCount === 0 && lines.length > 10) {
+      console.log('No prices found in text, treating as plain text');
+      menuItems.length = 0; // Clear the array
+      
+      // Just create one item per line, with the actual text
+      for (const line of lines) {
+        if (line.trim()) {
+          menuItems.push({
+            name: line.trim(),
+            category: 'Text Content'
+          });
+        }
       }
     }
     
