@@ -433,7 +433,7 @@
     
     // At least 20% of items should have prices to be considered a menu
     if (priceRatio < 0.2 && itemsWithPrices.length < 2) {
-      toasts.error('Few price information detected. This may not be a menu image.');
+      toasts.error('What the f are you trying to upload? This may not be a menu image.');
       return false;
     }
     
