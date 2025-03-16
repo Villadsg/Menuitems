@@ -445,13 +445,7 @@ export class OCRService {
     
     if (enhancedStructure && enhancedStructure.menuSections) {
       for (const section of enhancedStructure.menuSections) {
-        // Add the section header as a menu item
-        menuItems.push({
-          name: section.sectionName,
-          category: section.sectionName
-        });
-        
-        // Add each item in the section
+        // Process each item in the section
         if (section.items && Array.isArray(section.items)) {
           for (const item of section.items) {
             menuItems.push({
