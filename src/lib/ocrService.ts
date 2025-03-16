@@ -286,8 +286,11 @@ export class OCRService {
       
       // Check if line is all caps or ends with a colon - likely a category
       if (line.match(/^[A-Z\s]+$/) || line.endsWith(':')) {
-        // Just update the current category without adding it as a menu item
         currentCategory = line.trim().replace(/:$/, '');
+        menuItems.push({
+          name: currentCategory,
+          category: currentCategory
+        });
       } else if (priceMatch) {
         // This is likely a menu item with price
         const price = priceMatch[0];
@@ -442,8 +445,13 @@ export class OCRService {
     
     if (enhancedStructure && enhancedStructure.menuSections) {
       for (const section of enhancedStructure.menuSections) {
-        // Don't add the section header as a separate menu item to avoid duplicates
-        // Just add the items in the section
+        // Add the section header as a menu item
+        menuItems.push({
+          name: section.sectionName,
+          category: section.sectionName
+        });
+        
+        // Add each item in the section
         if (section.items && Array.isArray(section.items)) {
           for (const item of section.items) {
             menuItems.push({
