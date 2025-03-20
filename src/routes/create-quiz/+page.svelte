@@ -63,14 +63,19 @@
       const metadata = await exifr.parse(file, { gps: true });
       console.log('Full EXIF metadata:', metadata);
       if (metadata && metadata.GPSLatitude && metadata.GPSLongitude) {
-        lat = metadata.GPSLatitude.toString();
-        lng = metadata.GPSLongitude.toString();
-        showCoordinatesInput = false;
+        // Ensure we have valid numeric values
+        const validLat = !isNaN(parseFloat(metadata.GPSLatitude.toString()));
+        const validLng = !isNaN(parseFloat(metadata.GPSLongitude.toString()));
         
-        if (lat && lng) {
+        if (validLat && validLng) {
+          lat = metadata.GPSLatitude.toString();
+          lng = metadata.GPSLongitude.toString();
+          showCoordinatesInput = false;
           gpsMessage = 'GPS data was successfully loaded from the photo.';
         } else {
-          gpsMessage = 'Photo has no GPS data. Please enter manually or use current location.';
+          console.warn('Invalid GPS data format in metadata.');
+          showCoordinatesInput = true;
+          gpsMessage = 'Invalid GPS data format in photo. Please enter location manually.';
         }
       } else {
         console.warn('No valid GPS data found in metadata.');
@@ -480,6 +485,16 @@
         return;
       }
       
+      // Validate lat and lng values
+      const parsedLat = parseFloat(lat);
+      const parsedLng = parseFloat(lng);
+      
+      if (isNaN(parsedLat) || isNaN(parsedLng)) {
+        toasts.error('Invalid location coordinates. Please enter valid latitude and longitude values.');
+        showCoordinatesInput = true;
+        return;
+      }
+      
       loading = true;
       const mainPhotoFileId = await uploadMainPhoto();
       
@@ -493,8 +508,8 @@
       const documentData: Record<string, any> = {
         userId: userId,
         Route_name: routeName,
-        lat: parseFloat(lat),
-        lng: parseFloat(lng),
+        lat: parsedLat,
+        lng: parsedLng,
         dateModified: currentDate,
         photoFileId: mainPhotoFileId
       };
