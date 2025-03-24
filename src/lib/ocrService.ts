@@ -1,6 +1,8 @@
 import { storage, databases } from './appwrite';
 import { ID } from './appwrite';
 import { AppwriteService } from './appwriteService';
+import { applyMenuCorrections } from './menuCorrections';
+import { applyLearnedMenuCorrections, initializeMenuLearningSystem } from './menuLearningSystem';
 
 export interface MenuOCRResult {
   menuItems: {
@@ -39,6 +41,7 @@ export class OCRService {
    * @param bucketId The Appwrite storage bucket ID
    * @returns Processed menu text data
    */
+  
   static async processMenuImage(imageFileId: string, bucketId: string): Promise<MenuOCRResult> {
     try {
       // Get a direct download URL from Appwrite - this creates a publicly accessible URL
@@ -222,7 +225,16 @@ export class OCRService {
       };
       
       console.log('Processed OCR result:', ocrResult);
-      return ocrResult;
+      
+      // Apply basic menu corrections (price formatting, etc.)
+      const basicCorrectedResult = applyMenuCorrections(ocrResult);
+      console.log('Applied basic menu corrections to OCR result');
+      
+      // Apply learned corrections from feedback data
+      const fullyCorrectedResult = applyLearnedMenuCorrections(basicCorrectedResult);
+      console.log('Applied learned corrections from feedback data');
+      
+      return fullyCorrectedResult;
     } catch (error: unknown) {
       console.error('OCR processing error:', error);
       

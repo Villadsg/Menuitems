@@ -14,7 +14,7 @@
 import { config } from 'dotenv';
 import fs from 'fs';
 import path from 'path';
-import { Client, Storage, Query } from 'node-appwrite';
+import { Client, Storage, Query, Databases } from 'node-appwrite';
 import axios from 'axios';
 import { fileURLToPath } from 'url';
 
@@ -31,6 +31,8 @@ const appConfig = {
   projectId: process.env.PUBLIC_APPWRITE_PROJECT_ID,
   apiKey: process.env.APPWRITE_API_KEY, // This should be a server API key with storage permissions
   bucketId: process.env.APPWRITE_BUCKET_ID || '66efdb420000df196b64', // Default from your code
+  databaseId: process.env.APPWRITE_DATABASE_ID || '66efdb3c0000a6b0d9b9', // Database ID
+  feedbackCollectionId: '67dfc9c800121e7b3df6', // Menu OCR feedback collection ID
   outputDir: '/home/villadsg/Documents/menuphotos', // External storage directory
   emptyBucket: process.argv.includes('--empty-bucket')
 };
@@ -42,6 +44,7 @@ const client = new Client()
   .setKey(appConfig.apiKey);
 
 const storage = new Storage(client);
+const databases = new Databases(client);
 
 // Ensure output directory exists
 function ensureDirectoryExists(directory) {
@@ -104,7 +107,10 @@ async function main() {
     const metadata = {
       timestamp: now.toISOString(),
       bucketId: appConfig.bucketId,
-      files: []
+      databaseId: appConfig.databaseId,
+      feedbackCollectionId: appConfig.feedbackCollectionId,
+      files: [],
+      feedbackEntries: []
     };
     
     // List all files in the bucket
@@ -180,15 +186,85 @@ async function main() {
     fs.writeFileSync(metadataFile, JSON.stringify(metadata, null, 2));
     console.log(`Metadata saved to: ${metadataFile}`);
     
+    // Download menu OCR feedback data
+    console.log('\nFetching menu OCR feedback data...');
+    let feedbackOffset = 0;
+    let totalFeedback = 0;
+    let downloadedFeedback = 0;
+    
+    // Create a directory for feedback data
+    const feedbackDir = path.join(backupDir, 'feedback');
+    ensureDirectoryExists(feedbackDir);
+    
+    // Process feedback entries in batches
+    while (true) {
+      try {
+        const feedbackList = await databases.listDocuments(
+          appConfig.databaseId,
+          appConfig.feedbackCollectionId,
+          [
+            Query.limit(limit),
+            Query.offset(feedbackOffset)
+          ]
+        );
+        
+        if (!feedbackList.documents || feedbackList.documents.length === 0) {
+          break;
+        }
+        
+        totalFeedback += feedbackList.documents.length;
+        console.log(`Processing batch of ${feedbackList.documents.length} feedback entries (offset: ${feedbackOffset})...`);
+        
+        // Save each feedback entry
+        for (const feedback of feedbackList.documents) {
+          try {
+            // Create a JSON file for each feedback entry
+            const feedbackFileName = `feedback_${feedback.$id}.json`;
+            const feedbackPath = path.join(feedbackDir, feedbackFileName);
+            
+            // Save the feedback data
+            fs.writeFileSync(feedbackPath, JSON.stringify(feedback, null, 2));
+            
+            // Add to metadata
+            metadata.feedbackEntries.push({
+              id: feedback.$id,
+              imageId: feedback.image_id || '',
+              restaurantName: feedback.restaurant_name || '',
+              localPath: `feedback/${feedbackFileName}`,
+              createdAt: feedback.$createdAt
+            });
+            
+            downloadedFeedback++;
+            console.log(`Saved feedback entry: ${feedback.$id} (${downloadedFeedback}/${totalFeedback})`);
+          } catch (error) {
+            console.error(`Failed to save feedback entry ${feedback.$id}: ${error.message}`);
+          }
+        }
+        
+        // Move to next batch
+        feedbackOffset += feedbackList.documents.length;
+        
+        // If we got fewer entries than the limit, we've reached the end
+        if (feedbackList.documents.length < limit) {
+          break;
+        }
+      } catch (error) {
+        console.error(`Error fetching feedback data: ${error.message}`);
+        break;
+      }
+    }
+    
     // Summary
     console.log('\nDownload Summary:');
     console.log(`Total files: ${totalFiles}`);
     console.log(`Successfully downloaded: ${downloadedFiles}`);
     console.log(`Failed downloads: ${failedFiles}`);
+    console.log(`Total feedback entries: ${totalFeedback}`);
+    console.log(`Successfully downloaded feedback: ${downloadedFeedback}`);
     console.log(`Files saved to: ${backupDir}`);
     
-    // Empty the bucket if requested
-    if (appConfig.emptyBucket && totalFiles > 0) {
+    // Empty the bucket and feedback collection if requested
+    if (appConfig.emptyBucket && (totalFiles > 0 || totalFeedback > 0)) {
       console.log('\nEmptying bucket...');
       
       // Reset offset for deletion
@@ -228,9 +304,65 @@ async function main() {
         }
       }
       
-      console.log('\nDeletion Summary:');
+      console.log('\nFile Deletion Summary:');
       console.log(`Successfully deleted: ${deletedFiles}`);
       console.log(`Failed deletions: ${failedDeletions}`);
+      
+      // Delete feedback entries if requested
+      if (totalFeedback > 0) {
+        console.log('\nEmptying feedback collection...');
+        
+        // Reset offset for deletion
+        let feedbackOffset = 0;
+        let deletedFeedback = 0;
+        let failedFeedbackDeletions = 0;
+        
+        while (true) {
+          try {
+            const feedbackList = await databases.listDocuments(
+              appConfig.databaseId,
+              appConfig.feedbackCollectionId,
+              [
+                Query.limit(limit),
+                Query.offset(feedbackOffset)
+              ]
+            );
+            
+            if (!feedbackList.documents || feedbackList.documents.length === 0) {
+              break;
+            }
+            
+            console.log(`Deleting batch of ${feedbackList.documents.length} feedback entries...`);
+            
+            for (const feedback of feedbackList.documents) {
+              try {
+                await databases.deleteDocument(
+                  appConfig.databaseId,
+                  appConfig.feedbackCollectionId,
+                  feedback.$id
+                );
+                deletedFeedback++;
+                console.log(`Deleted feedback entry: ${feedback.$id}`);
+              } catch (error) {
+                console.error(`Failed to delete feedback entry ${feedback.$id}: ${error.message}`);
+                failedFeedbackDeletions++;
+              }
+            }
+            
+            // If we got fewer entries than the limit, we've reached the end
+            if (feedbackList.documents.length < limit) {
+              break;
+            }
+          } catch (error) {
+            console.error(`Error fetching feedback data for deletion: ${error.message}`);
+            break;
+          }
+        }
+        
+        console.log('\nFeedback Deletion Summary:');
+        console.log(`Successfully deleted: ${deletedFeedback}`);
+        console.log(`Failed deletions: ${failedFeedbackDeletions}`);
+      }
     }
     
     console.log('\nProcess completed successfully!');

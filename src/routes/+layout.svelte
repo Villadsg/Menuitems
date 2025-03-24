@@ -8,9 +8,19 @@
     import { toasts } from '$lib/stores/toastStore';
     import ToastContainer from '$lib/components/ToastContainer.svelte';
     import { fly, fade } from 'svelte/transition';
+    import { initializeMenuLearning } from '$lib/initMenuLearning';
 
-    onMount(() => {
+    onMount(async () => {
+      // Check user authentication
       checkUser();
+      
+      // Initialize menu learning system
+      try {
+        await initializeMenuLearning();
+        console.log('Menu learning system initialized');
+      } catch (error: any) {
+        console.error('Error initializing menu learning system:', error?.message || String(error));
+      }
     });
   
     const logout = async () => {

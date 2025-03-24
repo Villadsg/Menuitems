@@ -30,18 +30,22 @@
   let filesMainPhoto: FileList | null = null;
   let compressedFile: File | null = null;
   let photoPreviewUrl: string | null = null;
+  let photoFileId: string | null = null;
   let ocrProcessing = false;
   interface MenuItem {
     name: string;
     price?: string;
     description?: string;
     category?: string;
+    id?: string; // Add stable ID for menu items
   }
 
   interface OCRResult {
     menuItems: MenuItem[];
     rawText?: string;
     restaurantName?: string;
+    enhancedStructure?: any;
+    debug?: any;
   }
 
   let ocrResult: OCRResult | null = null;
@@ -141,13 +145,25 @@
         ]
       );
       
+      // Store the file ID for feedback collection
+      photoFileId = fileId;
+      
       // Process the image with OCR
       const ocrResultResponse = await OCRService.processMenuImage(fileId, bucketId);
       ocrResult = ocrResultResponse;
       
       // Initialize editable menu items with the OCR results
       if (ocrResultResponse && ocrResultResponse.menuItems) {
-        editableMenuItems = JSON.parse(JSON.stringify(ocrResultResponse.menuItems));
+        const itemsWithIds = JSON.parse(JSON.stringify(ocrResultResponse.menuItems));
+        
+        // Ensure each menu item has a stable ID
+        itemsWithIds.forEach((item: MenuItem) => {
+          if (!item.id) {
+            item.id = `item-${Math.random().toString(36).substring(2, 9)}`;
+          }
+        });
+        
+        editableMenuItems = itemsWithIds;
       }
       
       // Autofill restaurant name if available
@@ -247,13 +263,57 @@
     editableMenuItems = editableMenuItems.filter((_, i) => i !== index);
   };
   
-  // Function to save edited menu items
-  const saveEditedMenuItems = () => {
+  // Function to save edited menu items and store feedback for learning
+  const saveEditedMenuItems = async () => {
     if (ocrResult) {
+      // Store the original menu items before updating
+      const originalMenuItems = JSON.parse(JSON.stringify(ocrResult.menuItems));
+      
       // Update the OCR result with edited items
-      ocrResult.menuItems = JSON.parse(JSON.stringify(editableMenuItems));
+      // Force a complete refresh of the component by creating a new object
+      // Ensure each menu item has a stable ID
+      const updatedMenuItems = JSON.parse(JSON.stringify(editableMenuItems));
+      
+      // Add stable IDs for any items that don't have them
+      updatedMenuItems.forEach((item: MenuItem) => {
+        if (!item.id) {
+          item.id = `item-${Math.random().toString(36).substring(2, 9)}`;
+        }
+      });
+      
+      ocrResult = {
+        ...ocrResult,
+        menuItems: updatedMenuItems
+      };
+      
+      // Store the feedback for learning purposes
+      try {
+        // Create a feedback document with original and corrected data
+        const feedbackId = ID.unique();
+        await databases.createDocument(
+          AppwriteService.databaseId,
+          '67dfc9c800121e7b3df6', // menu_ocr_feedback collection ID
+          feedbackId,
+          {
+            original_items: JSON.stringify(originalMenuItems),
+            corrected_items: JSON.stringify(editableMenuItems),
+            raw_text: ocrResult.rawText,
+            restaurant_name: routeName,
+            image_id: photoFileId || '',
+            user_id: userId,
+            timestamp: new Date().toISOString(),
+            menu_structure: ocrResult.enhancedStructure ? JSON.stringify(ocrResult.enhancedStructure) : null
+          }
+        );
+        console.log('Menu OCR feedback saved for learning');
+        toasts.success("Menu items updated successfully. Your edits will help improve future menu recognition");
+      } catch (error) {
+        console.error('Failed to save menu OCR feedback:', error);
+        // Still update the UI even if feedback saving fails
+        toasts.success("Menu items updated successfully");
+      }
+      
       showMenuItemEditor = false;
-      toasts.success("Menu items updated successfully");
     }
   };
 
@@ -747,7 +807,7 @@
                           <h5 class="text-md font-semibold text-gray-700 mb-2">{category}</h5>
                           <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                             {#each ocrResult.menuItems.filter(item => item.category === category && item.name) as item}
-                              {@const itemId = `item-${Math.random().toString(36).substring(2, 9)}`}
+                              {@const itemId = item.id || `item-${Math.random().toString(36).substring(2, 9)}`}
                               <div class="menu-item-box">
                                 <button 
                                   class="menu-item-button"

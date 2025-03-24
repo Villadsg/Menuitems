@@ -51,16 +51,37 @@ export default async function handler(req, res) {
       - DO NOT try to convert non-menu text into a menu structure
       - If the text does not appear to be from a restaurant menu, return an empty structure with a note
       
+      Pay special attention to these common OCR issues:
+      1. Price formatting problems:
+         - Missing decimal points (e.g., "1299" should be "12.99")
+         - Inconsistent decimal notation (using commas instead of periods)
+         - Missing currency symbols
+      
+      2. Ingredient attribution issues:
+         - Correctly attribute ingredients/descriptions to their specific menu items
+         - Distinguish between shared descriptions and item-specific descriptions
+         - IMPORTANT: When a description applies to multiple items, include it with each relevant item
+         - Look for patterns like "all served with..." or groups of items with the same price
+      
       For each menu section or category:
       1. Identify section headings (typically in all caps, larger font, or followed by a list of items)
       2. For each menu item, extract:
-         - Item name
-         - Price
-         - Description (ingredients, preparation method, allergens, etc.)
+         - Item name (be precise about where the name ends and description begins)
+         - Price (ensure correct decimal formatting)
+         - Description (ingredients, preparation method, allergens, etc. that belong ONLY to this item)
+      
+      Common menu patterns to watch for:
+      - Some menus list ingredients after each item name
+      - Some menus have shared descriptions for a group of items (DUPLICATE this shared description for EACH item)
+      - Items with the same price in a category often share descriptions or preparation methods
+      - Descriptions containing phrases like "all served with", "comes with", or "choice of" typically apply to multiple items
+      - Prices may appear in various formats ($12.99, 12,99€, etc.)
+      - Descriptions often follow the item name and precede the price
       
       Format your response as a JSON object with the following structure:
       {
         "isMenu": true|false,
+        "restaurantName": "Name of restaurant if found, otherwise null",
         "menuSections": [
           {
             "sectionName": "APPETIZERS",
