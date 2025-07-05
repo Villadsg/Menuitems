@@ -2,7 +2,7 @@
 
 <script lang="ts">
   import { getCurrentLocation, calculateDistance } from '$lib/location'; // Import location utilities
-  import { databases } from '$lib/appwrite'; // Import the initialized Appwrite client
+  import { supabase } from '$lib/supabase'; // Import the initialized Supabase client
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { slide } from 'svelte/transition';
@@ -26,9 +26,7 @@
   let status = '';
   let loading = true;
   let searchQuery = '';
-  const databaseId = '6609473fbde756e5dc45';  
-  const collectionId = '66eefaaf001c2777deb9';  
-  const userCollectionId = '66fbb317002371bfdffc'; 
+ 
   let latitude: number | null = null;
   let longitude: number | null = null;
   let allMenuItems: MenuItem[] = [];
@@ -42,8 +40,8 @@
       price: item.price || null,
       description: item.description || '',
       category: category || item.category || 'Uncategorized',
-      restaurantName: doc.Route_name || 'Unknown Restaurant',
-      restaurantId: doc.$id,
+      restaurantName: doc.route_name || 'Unknown Restaurant',
+      restaurantId: doc.id,
       lat: parseFloat(doc.lat) || 0,
       lng: parseFloat(doc.lng) || 0,
       distance: 0 // Will be calculated later
@@ -54,14 +52,23 @@
   const loadAllMenuItems = async () => {
     try {
       loading = true;
-      const response = await databases.listDocuments(databaseId, collectionId);
-      console.log(`Loaded ${response.documents.length} restaurant documents`);
+      const { data: restaurants, error } = await supabase
+        .from('restaurants')
+        .select('*');
+      
+      if (error) {
+        console.error('Error fetching restaurants:', error);
+        status = 'Error loading restaurants';
+        return;
+      }
+      
+      console.log(`Loaded ${restaurants?.length || 0} restaurant documents`);
       
       const tempMenuItems: MenuItem[] = [];
       
-      for (const doc of response.documents) {
+      for (const doc of restaurants || []) {
         if (!doc.ocrdata) {
-          console.log(`Document ${doc.$id} (${doc.Route_name}) has no ocrdata`);
+          console.log(`Document ${doc.id} (${doc.route_name}) has no ocrdata`);
           continue;
         }
         

@@ -2,7 +2,7 @@
     import '../app.css'; // Import Tailwind CSS
     import { user, checkUser } from '$lib/userStore';
     import { onMount } from 'svelte';
-    import { account } from '$lib/appwrite';
+    import { SupabaseService } from '$lib/supabaseService';
 	  import { goto } from '$app/navigation';
     import "mapbox-gl/dist/mapbox-gl.css";
     import { toasts } from '$lib/stores/toastStore';
@@ -25,7 +25,7 @@
   
     const logout = async () => {
       try {
-        await account.deleteSession('current'); // Log out the current session
+        await SupabaseService.logout(); // Log out the current session
         user.set(null); // Set user to null after logging out
         toasts.success('Logged out successfully');
         goto("/logout")
@@ -53,25 +53,25 @@
       <div class="flex justify-between items-center h-16">
         <a href="/" class="flex items-center space-x-2" aria-label="MenuMap Home">
           <img src="/log35.png" class="h-10 w-10" alt="MenuMap Logo" />
-          <span class="text-xl font-bold text-green-600">MenuMap</span>
+          <span class="text-xl font-bold text-gray-600">MenuMap</span>
         </a>
         
         <nav class="hidden md:flex items-center space-x-6">
           {#if $user}
-            <a href="/create-quiz" class="text-gray-700 hover:text-green-600 transition-colors">Add menu items</a>
-            <a href="/find-quiz" class="text-gray-700 hover:text-green-600 transition-colors">Find menu items</a>
-            <a href="/profile" class="text-gray-700 hover:text-green-600 transition-colors">Profile</a>
+            <a href="/create-quiz" class="text-gray-700 hover:text-gray-600 transition-colors">Add menu items</a>
+            <a href="/find-quiz" class="text-gray-700 hover:text-gray-600 transition-colors">Find menu items</a>
+            <a href="/profile" class="text-gray-700 hover:text-gray-600 transition-colors">Profile</a>
             <button 
               on:click={logout} 
-              class="bg-green-500 hover:bg-green-600 text-white py-2 px-4 rounded-lg transition-colors"
+              class="bg-gray-600 hover:bg-gray-700 text-white py-2 px-4 rounded-lg transition-colors"
             >
               Logout
             </button>
           {:else}
-            <a href="/login" class="text-gray-700 hover:text-green-600 transition-colors">Login</a>
+            <a href="/login" class="text-gray-700 hover:text-gray-600 transition-colors">Login</a>
             <a 
               href="/signup" 
-              class="bg-green-500 hover:bg-green-600 text-white py-2 px-4 rounded-lg transition-colors"
+              class="bg-gray-600 hover:bg-gray-700 text-white py-2 px-4 rounded-lg transition-colors"
             >
               Sign Up
             </a>
@@ -80,7 +80,7 @@
         
         <!-- Mobile menu button -->
         <button 
-          class="md:hidden rounded-full p-2 text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-green-500"
+          class="md:hidden rounded-full p-2 text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-500"
           on:click={toggleMenu}
           aria-expanded={isMenuOpen}
           aria-label="Toggle menu"

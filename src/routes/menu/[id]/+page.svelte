@@ -1,7 +1,8 @@
 <script lang="ts">
   import { page } from '$app/stores';
   import { onMount } from 'svelte';
-  import { databases, storage } from '$lib/appwrite';
+  import { supabase } from '$lib/supabase';
+  import { SupabaseService } from '$lib/supabaseService';
   import { goto } from '$app/navigation';
   import { fly, fade } from 'svelte/transition';
   import Card from '$lib/components/Card.svelte';

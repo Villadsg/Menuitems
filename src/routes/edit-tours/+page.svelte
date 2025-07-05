@@ -1,8 +1,7 @@
 <script lang="ts">
-  import { databases, storage, ID } from '$lib/appwrite';
+  import { supabase } from '$lib/supabase';
   import { user } from '$lib/userStore';
   import { onMount } from 'svelte';
-  import { Query } from 'appwrite';
   import { compressImage } from '$lib/compress'; // Import the compress function
   import { fly, fade } from 'svelte/transition';
   import Card from '$lib/components/Card.svelte';

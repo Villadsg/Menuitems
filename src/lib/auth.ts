@@ -1,5 +1,5 @@
 // src/lib/auth.ts
-import { account } from './appwrite';
+import { supabase } from './supabase';
 import { writable } from 'svelte/store';
 import { goto } from '$app/navigation';
 
@@ -9,7 +9,8 @@ export const user = writable(null);
 // Function to check if a user is logged in
 export const checkUser = async () => {
   try {
-    const currentUser = await account.get();
+    const { data: { user: currentUser }, error } = await supabase.auth.getUser();
+    if (error) throw error;
     user.set(currentUser);
     return currentUser; // Return user object if logged in
   } catch (error) {
@@ -21,7 +22,8 @@ export const checkUser = async () => {
 // Function to log the user out
 export const logout = async () => {
   try {
-    await account.deleteSession('current');
+    const { error } = await supabase.auth.signOut();
+    if (error) throw error;
     user.set(null); // Set user to null after logging out
     goto('/logout');
   } catch (error) {

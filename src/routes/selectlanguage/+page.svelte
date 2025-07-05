@@ -1,8 +1,7 @@
 <script lang="ts">
   import { getCurrentLocation, calculateDistance } from '$lib/location'; // Import location utilities
   import { goto } from '$app/navigation';
-  import { databases, storage } from '$lib/appwrite'; 
-  import { Query } from 'appwrite';
+  import { supabase } from '$lib/supabase'; 
   import DistanceCheck from '$lib/distanceCheck.svelte'; // Import the DistanceCheck component
 
   let language = 'english'; // Default language
@@ -15,9 +14,7 @@
   let showDistanceCheck = false; // Boolean to show the DistanceCheck component
   let distanceFromMonument = 0; // Track distance to the monument
 
-  const databaseId = '6609473fbde756e5dc45';
-  const collectionIdEnglish = '66eefaaf001c2777deb9';
-  const bucketId = '66efdb420000df196b64';
+  const tableName = 'restaurants';
 
   const submitLanguage = async () => {
     isLoading = true;
@@ -50,24 +47,33 @@
     }
   };
 
-  // Load monuments from the Appwrite database
+  // Load monuments from the Supabase database
   const loadMonuments = async () => {
-    const response = await databases.listDocuments(databaseId, collectionIdEnglish,
-      language === 'english' ? [] : [Query.equal('language', language)]
-    );
-    monuments = await Promise.all(response.documents.map(async (doc) => {
+    const { data: restaurants, error } = await supabase
+      .from(tableName)
+      .select('*');
+    
+    if (error) {
+      console.error('Error fetching restaurants:', error);
+      return;
+    }
+    
+    monuments = restaurants.map((doc) => {
       let photoUrl = null;
-      if (doc.photoFileId) {
-        photoUrl = storage.getFilePreview(bucketId, doc.photoFileId).href;
+      if (doc.photo_file_id) {
+        const { data } = supabase.storage
+          .from('photos')
+          .getPublicUrl(doc.photo_file_id);
+        photoUrl = data.publicUrl;
       }
       return {
-        id: doc.$id,
-        name: doc.Route_name,
+        id: doc.id,
+        name: doc.route_name,
         lat: parseFloat(doc.lat),
         lng: parseFloat(doc.lng),
         photoUrl,
       };
-    }));
+    });
   };
 
   // Use the utility function to find the closest monument

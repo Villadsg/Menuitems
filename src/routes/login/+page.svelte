@@ -92,16 +92,16 @@
         
         <div class="flex items-center justify-between">
           <div class="flex items-center">
-            <input id="remember-me" type="checkbox" class="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded" />
+            <input id="remember-me" type="checkbox" class="h-4 w-4 text-gray-600 focus:ring-gray-500 border-gray-300 rounded" />
             <label for="remember-me" class="ml-2 block text-sm text-gray-700">Remember me</label>
           </div>
           
-          <a href="#" class="text-sm font-medium text-green-600 hover:text-green-500">Forgot password?</a>
+          <a href="#" class="text-sm font-medium text-gray-600 hover:text-gray-500">Forgot password?</a>
         </div>
         
         <button 
           type="submit" 
-          class="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors"
+          class="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-white bg-gray-600 hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors"
           disabled={loading}
         >
           {#if loading}
@@ -135,7 +135,7 @@
     
     <p class="text-center mt-6 text-gray-600">
       Don't have an account?
-      <a href="/signup" class="font-medium text-green-600 hover:text-green-500">Sign up</a>
+      <a href="/signup" class="font-medium text-gray-600 hover:text-gray-500">Sign up</a>
     </p>
   </div>
 </div>

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { fly } from 'svelte/transition';
-  import { databases, storage, account } from '$lib/appwrite';
+  import { supabase } from '$lib/supabase';
+  import { SupabaseService } from '$lib/supabaseService';
   import { page } from '$app/stores';
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';

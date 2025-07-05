@@ -1,8 +1,8 @@
 <script lang="ts">
-    import { account, databases, storage } from '$lib/appwrite';
+    import { SupabaseService } from '$lib/supabaseService';
+    import { supabase } from '$lib/supabase';
     import { onMount } from 'svelte';
     import { goto } from '$app/navigation';
-    import { Query } from 'appwrite';
     import { user } from '$lib/userStore';
     import { fly, fade } from 'svelte/transition';
     import Card from '$lib/components/Card.svelte';
@@ -16,26 +16,21 @@
     let loading = true;
     let activeTab = 'uploaded';
 
-    // Database and collection IDs
-    const databaseId = '6609473fbde756e5dc45';
-    const profileCollectionId = '66fbb317002371bfdffc';
-    const menuCollectionId = '66eefaaf001c2777deb9';
+    // Table names for Supabase
+    const profileTableName = 'user_profiles';
+    const menuTableName = 'restaurants';
 
     onMount(async () => {
         try {
             loading = true;
-            const userInfo = await account.get();
-            userId = userInfo.$id;
-            username = userInfo.name || 'Guest';
+            const userInfo = await SupabaseService.getAccount();
+            userId = userInfo.id;
+            username = userInfo.email || 'Guest';
 
             // Fetch user document
             if (userId) {
                 try {
-                    const userDocument = await databases.getDocument(
-                        databaseId,
-                        profileCollectionId,
-                        userId
-                    );
+                    const userDocument = await SupabaseService.getUserProfile(userId);
                     if (userDocument) {
                         usernamechange = userDocument.userNameChangable || username;
                         
@@ -50,14 +45,18 @@
                     console.log('No existing profile document found.');
                 }
                 
-                // Fetch uploaded menus
+                // Fetch uploaded menus using Supabase
                 try {
-                    const response = await databases.listDocuments(
-                        databaseId,
-                        menuCollectionId,
-                        [Query.equal('userId', userId)]
-                    );
-                    uploadedMenus = response.documents;
+                    const { data: restaurants, error } = await supabase
+                        .from(menuTableName)
+                        .select('*')
+                        .eq('user_id', userId);
+                    
+                    if (error) {
+                        console.error('Error fetching menus:', error);
+                    } else {
+                        uploadedMenus = restaurants || [];
+                    }
                 } catch (error) {
                     console.error('Error loading uploaded menus:', error);
                 }
@@ -85,9 +84,12 @@
         goto(`/menu/${menuId}`);
     }
     
-    function getFilePreviewUrl(fileId) {
-        if (!fileId) return '/placeholder-menu.jpg';
-        return storage.getFilePreview('66efdb420000df196b64', fileId, 400);
+    function getFilePreviewUrl(filePath) {
+        if (!filePath) return '/placeholder-menu.jpg';
+        const { data } = supabase.storage
+            .from('photos')
+            .getPublicUrl(filePath);
+        return data.publicUrl;
     }
     
     function setActiveTab(tab) {
@@ -164,25 +166,25 @@
                                             <div class="bg-white rounded-lg shadow overflow-hidden hover:shadow-md transition-shadow">
                                                 <div class="h-48 overflow-hidden">
                                                     <img 
-                                                        src={getFilePreviewUrl(menu.photoFileId)} 
-                                                        alt={menu.Route_name} 
+                                                        src={getFilePreviewUrl(menu.photo_file_id)} 
+                                                        alt={menu.route_name} 
                                                         class="w-full h-full object-cover"
                                                     />
                                                 </div>
                                                 <div class="p-4">
-                                                    <h4 class="text-lg font-semibold">{menu.Route_name}</h4>
+                                                    <h4 class="text-lg font-semibold">{menu.route_name}</h4>
                                                     <p class="text-gray-600 text-sm mt-1 line-clamp-2">
                                                         {typeof menu.Description === 'string' && menu.Description.startsWith('{') 
                                                             ? JSON.parse(menu.Description)?.EN || 'No description available'
                                                             : menu.Description || 'No description available'}
                                                     </p>
                                                     <p class="text-gray-500 text-xs mt-2">
-                                                        Uploaded: {new Date(menu.dateModified).toLocaleDateString()}
+                                                        Uploaded: {new Date(menu.date_modified).toLocaleDateString()}
                                                     </p>
                                                     <div class="mt-4 flex justify-end">
                                                         <button 
                                                             class="py-1 px-3 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded"
-                                                            on:click={() => navigateToMenu(menu.$id)}>
+                                                            on:click={() => navigateToMenu(menu.id)}>
                                                             View Details
                                                         </button>
                                                     </div>
@@ -218,7 +220,7 @@
                                             <div class="bg-white rounded-lg shadow p-4 hover:shadow-md transition-shadow">
                                                 <div class="flex justify-between items-start">
                                                     <div>
-                                                        <h4 class="text-lg font-semibold">{route.Route_name}</h4>
+                                                        <h4 class="text-lg font-semibold">{route.route_name}</h4>
                                                         <p class="text-gray-500 text-sm mt-1">
                                                             Visited on {new Date(route.Date).toLocaleDateString()}
                                                         </p>

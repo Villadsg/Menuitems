@@ -1,6 +1,5 @@
-import { storage, databases } from './appwrite';
-import { ID } from './appwrite';
-import { AppwriteService } from './appwriteService';
+import { supabase } from './supabase';
+import { SupabaseService } from './supabaseService';
 import { applyMenuCorrections } from './menuCorrections';
 import { applyLearnedMenuCorrections, initializeMenuLearningSystem } from './menuLearningSystem';
 
@@ -42,10 +41,11 @@ export class OCRService {
    * @returns Processed menu text data
    */
   
-  static async processMenuImage(imageFileId: string, bucketId: string): Promise<MenuOCRResult> {
+  static async processMenuImage(imageFileId: string, bucketId: string = 'photos'): Promise<MenuOCRResult> {
     try {
-      // Get a direct download URL from Appwrite - this creates a publicly accessible URL
-      const fileUrl = storage.getFileDownload(bucketId, imageFileId);
+      // Get a direct download URL from Supabase - this creates a publicly accessible URL
+      const { data: urlData } = supabase.storage.from(bucketId).getPublicUrl(imageFileId);
+      const fileUrl = urlData.publicUrl;
       console.log('File URL:', fileUrl);
       
       // Add a timestamp to avoid caching issues
@@ -348,12 +348,12 @@ export class OCRService {
   }
   
   /**
-   * Save OCR results to Appwrite database
+   * Save OCR results to Supabase database
    * @param menuId The ID of the menu document
    * @param ocrResult The OCR processing result
-   * @param collectionId The Appwrite collection ID for menu documents
+   * @param tableName The Supabase table name for menu documents
    */
-  static async saveOCRResults(menuId: string, ocrResult: MenuOCRResult, collectionId: string): Promise<void> {
+  static async saveOCRResults(menuId: string, ocrResult: MenuOCRResult, tableName: string): Promise<void> {
     try {
       // Create a structured and separable format for menu items
       const structuredMenuItems = this.createStructuredMenuItems(ocrResult.menuItems);
@@ -370,32 +370,22 @@ export class OCRService {
         updateData.ocr_enhanced_structure = JSON.stringify(ocrResult.enhancedStructure);
       }
       
-      console.log('Saving structured menu data to Appwrite:', structuredMenuItems);
+      console.log('Saving structured menu data to Supabase:', structuredMenuItems);
       
-      await databases.updateDocument(
-        AppwriteService.databaseId,
-        collectionId,
-        menuId,
-        updateData
-      );
+      await SupabaseService.updateDocument(tableName, menuId, updateData);
       
-      // Then save each menu item to a separate collection for individual access
+      // Then save each menu item to a separate table for individual access
       for (const item of ocrResult.menuItems) {
         // Skip category entries (they don't have a price)
         if (!item.name || item.name === item.category) continue;
         
-        await databases.createDocument(
-          AppwriteService.databaseId,
-          'menu_items', // You'll need to create this collection
-          ID.unique(),
-          {
-            menu_id: menuId,
-            name: item.name,
-            description: item.description || '',
-            price: item.price || '',
-            category: item.category || 'Uncategorized'
-          }
-        );
+        await SupabaseService.createDocument('menu_items', {
+          menu_id: menuId,
+          name: item.name,
+          description: item.description || '',
+          price: item.price || '',
+          category: item.category || 'Uncategorized'
+        });
       }
     } catch (error) {
       console.error('Error saving OCR results:', error);
@@ -588,7 +578,7 @@ export class OCRService {
           name: item.name,
           price: item.price || null,
           description: item.description || '',
-          id: ID.unique() // Add a unique ID for each item to make them easily referenceable
+          id: crypto.randomUUID() // Add a unique ID for each item to make them easily referenceable
         });
       }
     }

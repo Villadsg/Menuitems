@@ -15,8 +15,14 @@ import { initializeMenuLearningSystem } from './menuLearningSystem';
 export async function initializeMenuLearning(): Promise<void> {
   console.log('Initializing menu learning system...');
   
+  // Skip initialization in browser environment
+  if (typeof window !== 'undefined') {
+    console.log('Skipping menu learning system initialization in browser environment');
+    return;
+  }
+  
   try {
-    // Initialize from the default location
+    // Initialize from the default location (server-side only)
     await initializeMenuLearningSystem();
     console.log('Menu learning system initialized successfully');
   } catch (error) {

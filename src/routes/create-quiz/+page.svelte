@@ -1,16 +1,14 @@
 <script lang="ts">
-  import { databases, storage, ID, Permission, Role, Query } from '$lib/appwrite'; 
+  import { SupabaseService } from '$lib/supabaseService';
   import { goto } from '$app/navigation';
   import { user } from '$lib/userStore';
   import { fly, fade } from 'svelte/transition';
-  import { AppwriteService } from '$lib/appwriteService';
   import { getCurrentLocation } from '$lib/location';
   import exifr from 'exifr'; // Import exifr for EXIF data extraction
   import { compressImage } from '$lib/compress'; 
   import { toasts } from '$lib/stores/toastStore';
   import Loading from '$lib/components/Loading.svelte';
-  import Card from '$lib/components/Card.svelte';
-  import Input from '$lib/components/Input.svelte';
+
   import { OCRService } from '$lib/ocrService'; // Import OCR service
   // No longer need CryptoJS as we'll use Appwrite's built-in signature
  
@@ -55,11 +53,11 @@
   let loading = false;
   let uploadProgress = 0;
 
-  let bucketId = '66efdb420000df196b64';
-  const collectionId = '66eefaaf001c2777deb9';
+  let bucketId = 'photos';
+  const tableName = 'restaurants';
   
   let currentPage = 'beginSection';
-  $: userId = $user?.$id || 'anonymous';
+  $: userId = $user?.id || 'anonymous';
   
   /** Function to extract coordinates from EXIF metadata */
   const extractPhotoCoordinates = async (file: File) => {
@@ -131,25 +129,14 @@
       
       // Upload the file temporarily to get a file ID
       const fileToUpload = compressedFile || filesMainPhoto?.[0];
-      const fileId = ID.unique();
       
-      const uploadResponse = await storage.createFile(
-        bucketId,
-        fileId,
-        fileToUpload,
-        [
-          Permission.read(Role.any()),
-          Permission.write(Role.any()),
-          Permission.update(Role.any()),
-          Permission.delete(Role.any())
-        ]
-      );
+      const uploadResponse = await SupabaseService.uploadFile(fileToUpload, bucketId);
       
       // Store the file ID for feedback collection
-      photoFileId = fileId;
+      photoFileId = uploadResponse.path;
       
       // Process the image with OCR
-      const ocrResultResponse = await OCRService.processMenuImage(fileId, bucketId);
+      const ocrResultResponse = await OCRService.processMenuImage(uploadResponse.path, bucketId);
       ocrResult = ocrResultResponse;
       
       // Initialize editable menu items with the OCR results
@@ -289,22 +276,16 @@
       // Store the feedback for learning purposes
       try {
         // Create a feedback document with original and corrected data
-        const feedbackId = ID.unique();
-        await databases.createDocument(
-          AppwriteService.databaseId,
-          '67dfc9c800121e7b3df6', // menu_ocr_feedback collection ID
-          feedbackId,
-          {
-            original_items: JSON.stringify(originalMenuItems),
-            corrected_items: JSON.stringify(editableMenuItems),
-            raw_text: ocrResult.rawText,
-            restaurant_name: routeName,
-            image_id: photoFileId || '',
-            user_id: userId,
-            timestamp: new Date().toISOString(),
-            menu_structure: ocrResult.enhancedStructure ? JSON.stringify(ocrResult.enhancedStructure) : null
-          }
-        );
+        await SupabaseService.createDocument('menu_ocr_feedback', {
+          original_items: JSON.stringify(originalMenuItems),
+          corrected_items: JSON.stringify(editableMenuItems),
+          raw_text: ocrResult.rawText,
+          restaurant_name: routeName,
+          image_id: photoFileId || '',
+          user_id: userId,
+          timestamp: new Date().toISOString(),
+          menu_structure: ocrResult.enhancedStructure ? JSON.stringify(ocrResult.enhancedStructure) : null
+        });
         console.log('Menu OCR feedback saved for learning');
         toasts.success("Menu items updated successfully. Your edits will help improve future menu recognition");
       } catch (error) {
@@ -317,106 +298,16 @@
     }
   };
 
+  // Simplified duplicate checking for Supabase (can be enhanced later)
   const findDuplicateImage = async (file: File): Promise<string | null> => {
-    try {
-      // Calculate MD5 hash of the file (this is done client-side before upload)
-      // We'll use this to check if a file with the same signature already exists
-      
-      // First, get a list of all files in the bucket
-      // We'll limit to 100 files for performance, adjust as needed
-      const filesList = await storage.listFiles(
-        bucketId,
-        [Query.limit(100)]
-      );
-      
-      // Check if there are any files in the bucket
-      if (!filesList || !filesList.files || filesList.files.length === 0) {
-        console.log('No files in bucket to check for duplicates');
-        return null;
-      }
-      
-      // Get file size to compare with existing files
-      const fileSize = file.size;
-      const fileName = file.name;
-      
-      // Log for debugging
-      console.log(`Checking for duplicates of ${fileName} (${fileSize} bytes)`);
-      
-      // Look for files with similar properties
-      for (const existingFile of filesList.files) {
-        // Check if the file has similar properties (size within 5% difference)
-        const sizeDifference = Math.abs(existingFile.sizeOriginal - fileSize);
-        const sizeThreshold = fileSize * 0.05; // 5% threshold
-        
-        if (sizeDifference <= sizeThreshold) {
-          console.log(`Found potential duplicate: ${existingFile.$id} with similar size`);
-          
-          // We found a potential duplicate based on size
-          // We'll use this file ID to avoid uploading a duplicate
-          return existingFile.$id;
-        }
-      }
-      
-      return null;
-    } catch (error) {
-      console.error('Error checking for duplicate images:', error);
-      return null;
-    }
+    // For now, we'll skip duplicate detection and let Supabase handle storage
+    return null;
   };
   
-  /**
-   * Delete duplicate menu photos from the bucket
-   * This function will be called after a successful upload to clean up any other duplicates
-   * @param currentFileId The ID of the file we just uploaded and want to keep
-   * @param fileSize The size of the file we want to keep
-   */
+  // Simplified cleanup for Supabase (can be enhanced later)
   const cleanupDuplicateMenuPhotos = async (currentFileId: string, fileSize: number): Promise<void> => {
-    try {
-      // Get all files in the bucket
-      const filesList = await storage.listFiles(
-        bucketId,
-        [Query.limit(100)]
-      );
-      
-      if (!filesList || !filesList.files || filesList.files.length <= 1) {
-        // No need to check if there's only one file or none
-        return;
-      }
-      
-      // Find the file we just uploaded to get its details
-      const currentFile = filesList.files.find(file => file.$id === currentFileId);
-      if (!currentFile) {
-        console.warn('Could not find current file in bucket, skipping duplicate cleanup');
-        return;
-      }
-      
-      // Get the files that are potential duplicates (similar size, not the current file)
-      const potentialDuplicates = filesList.files.filter(file => {
-        // Skip the current file
-        if (file.$id === currentFileId) return false;
-        
-        // Check if the file has similar size (within 5% difference)
-        const sizeDifference = Math.abs(file.sizeOriginal - fileSize);
-        const sizeThreshold = fileSize * 0.05; // 5% threshold
-        
-        return sizeDifference <= sizeThreshold;
-      });
-      
-      console.log(`Found ${potentialDuplicates.length} potential duplicate menu photos to clean up`);
-      
-      // Delete the duplicate files
-      for (const duplicate of potentialDuplicates) {
-        try {
-          await storage.deleteFile(bucketId, duplicate.$id);
-          console.log(`Deleted duplicate menu photo: ${duplicate.$id}`);
-          toasts.success('Deleted duplicate menu photo to save storage space');
-        } catch (deleteError) {
-          console.error(`Failed to delete duplicate file ${duplicate.$id}:`, deleteError);
-        }
-      }
-    } catch (error) {
-      console.error('Error cleaning up duplicate menu photos:', error);
-    }
+    // For now, we'll skip cleanup and let Supabase handle storage management
+    return;
   };
 
   /** Function to upload the main photo */
@@ -443,30 +334,14 @@
         return duplicateFileId;
       }
       
-      // Create a unique file ID
-      const fileId = ID.unique();
-      
-      // Upload the file to Appwrite Storage with hash metadata
-      const response = await storage.createFile(
-        bucketId,
-        fileId,
-        fileToUpload,
-        [
-          Permission.read(Role.any()),
-          Permission.write(Role.any()),
-          Permission.update(Role.any()),
-          Permission.delete(Role.any())
-        ],
-        (progress) => {
-          uploadProgress = Math.round(progress);
-        }
-      );
+      // Upload the file to Supabase Storage
+      const response = await SupabaseService.uploadFile(fileToUpload, bucketId);
       
       // After successful upload, clean up any other duplicate menu photos
-      await cleanupDuplicateMenuPhotos(fileId, fileToUpload.size);
+      await cleanupDuplicateMenuPhotos(response.path, fileToUpload.size);
       
       console.log('File uploaded successfully:', response);
-      return fileId;
+      return response.path;
     } catch (error) {
       console.error('Error uploading file:', error);
       toasts.error('Error uploading file: ' + error.message);
@@ -566,12 +441,12 @@
       
       // Create the document in the database
       const documentData: Record<string, any> = {
-        userId: userId,
-        Route_name: routeName,
+        user_id: userId,
+        route_name: routeName,
         lat: parsedLat,
         lng: parsedLng,
-        dateModified: currentDate,
-        photoFileId: mainPhotoFileId
+        date_modified: currentDate,
+        photo_file_id: mainPhotoFileId
       };
       
       // Add OCR data if available
@@ -588,18 +463,7 @@
         documentData.ocrdata = JSON.stringify(structuredMenuItems);
       }
       
-      const response = await databases.createDocument(
-        AppwriteService.databaseId,
-        collectionId,
-        ID.unique(),
-        documentData,
-        [
-          Permission.read(Role.any()),
-          Permission.write(Role.any()),
-          Permission.update(Role.any()),
-          Permission.delete(Role.any())
-        ]
-      );
+      const response = await SupabaseService.createDocument(tableName, documentData);
       
       console.log('Document created successfully:', response);
       toasts.success('Menu uploaded successfully!');
@@ -634,11 +498,12 @@
   };
 </script>
 
-<div class="container mx-auto px-4 py-8">
+<div class="min-h-screen bg-gradient-to-br from-slate-50 to-gray-100">
+  <div class="container mx-auto px-4 py-8">
   {#key currentPage}
     {#if currentPage === 'beginSection'}
       <div in:fly={{ y: 20, duration: 300 }} class="max-w-2xl mx-auto">
-        <Card padding="p-8">
+        <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-8 border border-white/20">
           <div class="mb-6">
             <h1 class="text-3xl font-bold text-gray-800 mb-2">Add Menu Content</h1>
             <p class="text-gray-600">Upload your menu photo and we'll extract the content using OCR technology.</p>
@@ -653,13 +518,13 @@
                 bind:value={routeName} 
                 placeholder="e.g. Joe's Italian Bistro" 
                 required 
-                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-gray-500"
               />
               {#if ocrResult && ocrResult.restaurantName && ocrResult.restaurantName !== "Unknown Restaurant"}
                 {#if ocrResult.restaurantName.includes(" OR ")}
-                  <p class="text-xs text-blue-600 mt-1">Multiple possible names detected from menu</p>
+                  <p class="text-xs text-gray-600 mt-1">Multiple possible names detected from menu</p>
                 {:else if routeName === ocrResult.restaurantName}
-                  <p class="text-xs text-green-600 mt-1">Name detected from menu image</p>
+                  <p class="text-xs text-gray-600 mt-1">Name detected from menu image</p>
                 {/if}
               {/if}
             </div>
@@ -673,7 +538,7 @@
                   accept="image/*" 
                   bind:files={filesMainPhoto} 
                   on:change={handlePhotoUpload}
-                  class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                  class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-gray-50 file:text-gray-700 hover:file:bg-gray-100"
                 />
                 <p class="text-xs text-gray-500 mt-1">Upload a clear photo of the menu.</p>
                 
@@ -708,7 +573,7 @@
                   <!-- OCR Button -->
                   <button 
                     on:click={processImageWithOCR} 
-                    class="mt-3 w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition duration-200 flex items-center justify-center"
+                    class="mt-3 w-full bg-gray-600 hover:bg-gray-700 text-white font-medium py-2 px-4 rounded-md transition duration-200 flex items-center justify-center"
                     disabled={ocrProcessing}
                   >
                     {#if ocrProcessing}
@@ -742,7 +607,7 @@
                       bind:value={lat} 
                       placeholder="e.g. 41.8781" 
                       required 
-                      class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                      class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-gray-500"
                     />
                   </div>
                   
@@ -755,14 +620,14 @@
                       bind:value={lng} 
                       placeholder="e.g. -87.6298" 
                       required 
-                      class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                      class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-gray-500"
                     />
                   </div>
                 </div>
                 
                 <button 
                   type="button" 
-                  class="w-full flex items-center justify-center py-2 px-4 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
+                  class="w-full flex items-center justify-center py-2 px-4 bg-gray-50 text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors"
                   on:click={fetchCurrentLocation} 
                   disabled={loading}
                 >
@@ -788,7 +653,7 @@
                     <!-- Add button to edit menu items -->
                     <button
                       type="button"
-                      class="text-blue-600 font-bold text-sm inline-flex items-center mb-4 bg-blue-50 hover:bg-blue-100 px-3 py-2 rounded-full transition-all"
+                      class="text-gray-600 font-bold text-sm inline-flex items-center mb-4 bg-gray-50 hover:bg-gray-100 px-3 py-2 rounded-full transition-all"
                       on:click={() => {
                         // Copy OCR result items to editable items
                         if (ocrResult && ocrResult.menuItems) {
@@ -821,7 +686,7 @@
                                   <div class="flex justify-between items-center w-full">
                                     <span class="item-name font-medium">{item.name}</span>
                                     {#if item.price}
-                                      <span class="item-price text-green-600 font-semibold">{item.price}</span>
+                                      <span class="item-price text-gray-600 font-semibold">{item.price}</span>
                                     {/if}
                                   </div>
                                 </button>
@@ -912,7 +777,7 @@
             
             <button 
               type="button" 
-              class="w-full flex items-center justify-center py-3 px-4 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+              class="w-full flex items-center justify-center py-3 px-4 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
               on:click={submitQuiz}
               disabled={loading}
             >
@@ -930,23 +795,24 @@
               {/if}
             </button>
           </div>
-        </Card>
+        </div>
       </div>
     {:else if currentPage === 'confirmationPage'}
       <div in:fly={{ y: 20, duration: 300 }} class="max-w-md mx-auto text-center">
-        <Card padding="p-8">
+        <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-8 border border-white/20">
           <div class="flex flex-col items-center">
-            <div class="bg-green-100 text-green-600 w-16 h-16 rounded-full flex items-center justify-center mb-4">
+            <div class="bg-gray-100 text-gray-600 w-16 h-16 rounded-full flex items-center justify-center mb-4">
               <i class="fas fa-check text-2xl"></i>
             </div>
             <h2 class="text-2xl font-bold text-gray-800 mb-2">Success!</h2>
             <p class="text-gray-600 mb-6">Your menu has been uploaded successfully.</p>
             <p class="text-gray-500">Redirecting you to the home page...</p>
           </div>
-        </Card>
+        </div>
       </div>
     {/if}
   {/key}
+  </div>
 </div>
 
 <!-- Menu Item Editor Popup -->
@@ -1028,7 +894,7 @@
         <div class="flex justify-between mt-6">
           <button
             type="button"
-            class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors"
+            class="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors"
             on:click={addMenuItem}
           >
             <i class="fas fa-plus mr-2"></i> Add New Item
@@ -1045,7 +911,7 @@
             
             <button
               type="button"
-              class="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors"
+              class="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors"
               on:click={saveEditedMenuItems}
             >
               Save Changes

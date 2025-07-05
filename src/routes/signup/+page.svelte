@@ -1,7 +1,6 @@
 <script lang="ts">
-  import { account } from '$lib/appwrite';
+  import { SupabaseService } from '$lib/supabaseService';
   import { goto } from '$app/navigation';
-  import { ID } from 'appwrite';
   import { toasts } from '$lib/stores/toastStore';
   import Input from '$lib/components/Input.svelte';
   import Loading from '$lib/components/Loading.svelte';
@@ -68,7 +67,7 @@
     
     try {
       loading = true;
-      await account.create(ID.unique(), email, password, username);
+      await SupabaseService.signUp(email, password);
       toasts.success('Account created successfully!');
       goto('/login');
     } catch (error) {
@@ -142,7 +141,7 @@
         
         <button 
           type="submit" 
-          class="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors"
+          class="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-white bg-gray-600 hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors"
           disabled={loading}
         >
           {#if loading}
@@ -176,7 +175,7 @@
     
     <p class="text-center mt-6 text-gray-600">
       Already have an account?
-      <a href="/login" class="font-medium text-green-600 hover:text-green-500">Sign in</a>
+      <a href="/login" class="font-medium text-gray-600 hover:text-gray-500">Sign in</a>
     </p>
   </div>
 </div>

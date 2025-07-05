@@ -1,12 +1,12 @@
 <script lang="ts">
-    import { account, databases } from '$lib/appwrite';
+    import { SupabaseService } from '$lib/supabaseService';
     import { onMount } from 'svelte';
     import { goto } from '$app/navigation';
     import { user } from '$lib/userStore';
     import { fly, fade } from 'svelte/transition';
     import Card from '$lib/components/Card.svelte';
 
-    $: userId = $user?.$id;
+    $: userId = $user?.id;
 
     let username = '';
     let preferredLanguage = ''; 
@@ -14,8 +14,7 @@
     let loading = false;
     let successMessage = '';
 
-    const databaseId = '6609473fbde756e5dc45';
-    const collectionId = '66fbb317002371bfdffc';
+    const tableName = 'user_profiles';
 
     const languageMap = {
         'English': 'EN',
@@ -29,15 +28,11 @@
     onMount(async () => {
         try {
             loading = true;
-            const userInfo = await account.get();
-            username = userInfo.name || 'Guest';
+            const userInfo = await SupabaseService.getAccount();
+            username = userInfo.email || 'Guest';
 
             try {
-                const userDocument = await databases.getDocument(
-                    databaseId,
-                    collectionId,
-                    userId
-                );
+                const userDocument = await SupabaseService.getUserProfile(userId);
                 if (userDocument) {
                     // Use langSpeak as the preferred language
                     preferredLanguage = Object.keys(languageMap).find(
@@ -66,40 +61,31 @@
             loading = true;
             let userDocument;
             try {
-                userDocument = await databases.getDocument(
-                    databaseId,
-                    collectionId,
-                    userId
-                );
+                userDocument = await SupabaseService.getUserProfile(userId);
             } catch (error) {
                 console.log('Document not found, creating a new one.');
             }
 
+            const profileData = {
+                user_id: userId,
+                langSpeak: languageMap[preferredLanguage],
+                userNameChangable: usernamechange
+            };
+
             if (userDocument) {
-                const response = await databases.updateDocument(
-                    databaseId,
-                    collectionId,
-                    userId,
-                    {
-                        langSpeak: languageMap[preferredLanguage],
-                        userNameChangable: usernamechange
-                    }
-                );
+                // Remove user_id from update data since it shouldn't be updated
+                const updateData = {
+                    langSpeak: languageMap[preferredLanguage],
+                    userNameChangable: usernamechange
+                };
+                const response = await SupabaseService.updateUserProfile(userId, updateData);
                 console.log('Profile updated successfully:', response);
                 successMessage = 'Profile updated successfully!';
                 setTimeout(() => {
                     goto("/profile");
                 }, 1500);
             } else {
-                const response = await databases.createDocument(
-                    databaseId,
-                    collectionId,
-                    userId,
-                    {
-                        langSpeak: languageMap[preferredLanguage],
-                        userNameChangable: usernamechange
-                    }
-                );
+                const response = await SupabaseService.createDocument(tableName, profileData);
                 console.log('New profile created successfully:', response);
                 successMessage = 'Profile created successfully!';
                 setTimeout(() => {
