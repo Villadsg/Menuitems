@@ -23,7 +23,15 @@
     onMount(async () => {
         try {
             loading = true;
+            
+            // Check if user is authenticated
             const userInfo = await SupabaseService.getAccount();
+            if (!userInfo) {
+                // User is not logged in, redirect to login page
+                goto('/login');
+                return;
+            }
+            
             userId = userInfo.id;
             username = userInfo.email || 'Guest';
 
@@ -32,7 +40,7 @@
                 try {
                     const userDocument = await SupabaseService.getUserProfile(userId);
                     if (userDocument) {
-                        usernamechange = userDocument.userNameChangable || username;
+                        usernamechange = userDocument.usernamechangable || username;
                         
                         // Get completed routes
                         if (userDocument.locationsDone && userDocument.locationsDone.length > 0) {

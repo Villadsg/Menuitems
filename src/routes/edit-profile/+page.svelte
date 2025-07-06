@@ -36,9 +36,9 @@
                 if (userDocument) {
                     // Use langSpeak as the preferred language
                     preferredLanguage = Object.keys(languageMap).find(
-                        key => languageMap[key] === userDocument.langSpeak
+                        key => languageMap[key] === userDocument.langspeak
                     ) || 'English'; // Default to English if not found
-                    usernamechange = userDocument.userNameChangable || username;
+                    usernamechange = userDocument.usernamechangable || username;
                 }
             } catch (error) {
                 console.log('No existing document, filling form with default values.');
@@ -59,39 +59,20 @@
 
         try {
             loading = true;
-            let userDocument;
-            try {
-                userDocument = await SupabaseService.getUserProfile(userId);
-            } catch (error) {
-                console.log('Document not found, creating a new one.');
-            }
-
+            
             const profileData = {
-                user_id: userId,
-                langSpeak: languageMap[preferredLanguage],
-                userNameChangable: usernamechange
+                email: username, // Use the current username/email
+                langspeak: languageMap[preferredLanguage],
+                usernamechangable: usernamechange
             };
 
-            if (userDocument) {
-                // Remove user_id from update data since it shouldn't be updated
-                const updateData = {
-                    langSpeak: languageMap[preferredLanguage],
-                    userNameChangable: usernamechange
-                };
-                const response = await SupabaseService.updateUserProfile(userId, updateData);
-                console.log('Profile updated successfully:', response);
-                successMessage = 'Profile updated successfully!';
-                setTimeout(() => {
-                    goto("/profile");
-                }, 1500);
-            } else {
-                const response = await SupabaseService.createDocument(tableName, profileData);
-                console.log('New profile created successfully:', response);
-                successMessage = 'Profile created successfully!';
-                setTimeout(() => {
-                    goto("/profile");
-                }, 1500);
-            }
+            // Use upsert to insert or update the profile
+            const response = await SupabaseService.upsertUserProfile(userId, profileData);
+            console.log('Profile saved successfully:', response);
+            successMessage = 'Profile saved successfully!';
+            setTimeout(() => {
+                goto("/profile");
+            }, 1500);
         } catch (error) {
             console.error('Failed to update or create profile:', error);
         } finally {

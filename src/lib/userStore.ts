@@ -9,10 +9,21 @@ export const checkUser = async () => {
     const { data: { user: loggedInUser }, error } = await supabase.auth.getUser();
     if (error) throw error;
     user.set(loggedInUser);  // Update the store
+    return loggedInUser;
   } catch (error) {
     user.set(null); // If not logged in, set to null
+    return null;
   }
 };
+
+// Set up auth state listener
+supabase.auth.onAuthStateChange((event, session) => {
+  if (session?.user) {
+    user.set(session.user);
+  } else {
+    user.set(null);
+  }
+});
 
 // Function to log in a user
 export const loginUser = async (email: string, password: string) => {

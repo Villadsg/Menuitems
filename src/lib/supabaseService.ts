@@ -70,6 +70,20 @@ export const SupabaseService = {
     return result;
   },
 
+  // Upsert (insert or update) a user profile
+  async upsertUserProfile(userId: string, data: any) {
+    const profileData = { ...data, user_id: userId };
+    
+    const { data: result, error } = await supabase
+      .from('user_profiles')
+      .upsert(profileData, { onConflict: 'user_id' })
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return result;
+  },
+
   // Delete a document by table and document ID
   async deleteDocument(tableName: string, documentId: string) {
     const { error } = await supabase
