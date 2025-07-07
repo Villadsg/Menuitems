@@ -17,124 +17,217 @@ export interface MenuOCRResult {
 }
 
 export class OCRService {
-  // Support both Netlify and Vercel serverless functions for OCR API
-  private static netlifyOcrUrl = '/.netlify/functions/ocr-service';
-  private static vercelOcrUrl = '/api/ocr-service';
-  
+  // Default configuration for local Qwen 2.5 VL instance
+  private static defaultConfig = {
+    baseUrl: 'http://localhost:11434', // Default Ollama port
+    model: 'qwen2.5vl:7b',
+    timeout: 30000
+  };
+
   /**
-   * Get the appropriate OCR URL based on the deployment environment
-   * @returns The OCR API URL
+   * Get OCR configuration from environment or use defaults
+   * @returns OCR configuration
    */
-  private static getOcrUrl(): string {
-    // Check if we're on Vercel by looking for the vercel.app domain
-    const isVercel = typeof window !== 'undefined' && 
-                    (window.location.hostname.includes('vercel.app') || 
-                     window.location.hostname.includes('vercel-analytics'));
-    
-    return isVercel ? this.vercelOcrUrl : this.netlifyOcrUrl;
+  private static getConfig() {
+    // In browser environment, always use default localhost config
+    if (typeof window !== 'undefined') {
+      return this.defaultConfig;
+    }
+
+    // Server-side: Check for custom configuration from environment
+    const customConfig = {
+      baseUrl: (typeof process !== 'undefined' && process.env?.QWEN_VL_BASE_URL) || this.defaultConfig.baseUrl,
+      model: (typeof process !== 'undefined' && process.env?.QWEN_VL_MODEL) || this.defaultConfig.model,
+      timeout: parseInt((typeof process !== 'undefined' && process.env?.QWEN_VL_TIMEOUT) || String(this.defaultConfig.timeout))
+    };
+
+    return customConfig;
   }
   
   /**
-   * Process an image with OCR to extract menu text
-   * @param imageFileId The Appwrite storage file ID
-   * @param bucketId The Appwrite storage bucket ID
+   * Process an image with OCR to extract menu text using Qwen 2.5 VL
+   * @param imageFileId The Supabase storage file ID
+   * @param bucketId The Supabase storage bucket ID
    * @returns Processed menu text data
    */
-  
   static async processMenuImage(imageFileId: string, bucketId: string = 'photos'): Promise<MenuOCRResult> {
     try {
-      // Get a direct download URL from Supabase - this creates a publicly accessible URL
-      const { data: urlData } = supabase.storage.from(bucketId).getPublicUrl(imageFileId);
-      const fileUrl = urlData.publicUrl;
+      const config = this.getConfig();
+      
+      // Try to get a signed URL first (for private buckets), fallback to public URL
+      let fileUrl = '';
+      
+      try {
+        // Try signed URL first (expires in 1 hour)
+        const { data: signedUrlData, error: signedError } = await supabase.storage
+          .from(bucketId)
+          .createSignedUrl(imageFileId, 3600);
+        
+        if (signedError || !signedUrlData?.signedUrl) {
+          console.log('Signed URL failed, trying public URL...');
+          // Fallback to public URL
+          const { data: urlData } = supabase.storage.from(bucketId).getPublicUrl(imageFileId);
+          fileUrl = urlData.publicUrl;
+        } else {
+          fileUrl = signedUrlData.signedUrl;
+          console.log('Using signed URL');
+        }
+      } catch (error) {
+        console.log('Error getting signed URL, using public URL:', error);
+        // Fallback to public URL
+        const { data: urlData } = supabase.storage.from(bucketId).getPublicUrl(imageFileId);
+        fileUrl = urlData.publicUrl;
+      }
+      
       console.log('File URL:', fileUrl);
       
-      // Add a timestamp to avoid caching issues
-      const timestamp = Date.now();
-      const fileUrlWithTimestamp = `${fileUrl}&timestamp=${timestamp}`;
-      console.log('File URL with timestamp:', fileUrlWithTimestamp);
+      // Add a timestamp to avoid caching issues (only if not already a signed URL)
+      let finalUrl = fileUrl;
+      if (!fileUrl.includes('token=')) {
+        const timestamp = Date.now();
+        const separator = fileUrl.includes('?') ? '&' : '?';
+        finalUrl = `${fileUrl}${separator}timestamp=${timestamp}`;
+      }
+      console.log('Final URL:', finalUrl);
       
-      // Call our serverless function for OCR
-      const ocrUrl = this.getOcrUrl();
-      console.log('Calling OCR serverless function at:', ocrUrl);
-      const response = await fetch(ocrUrl, {
+      // Convert image URL to base64 for Ollama
+      console.log('Fetching and converting image to base64...');
+      let imageBase64 = '';
+      
+      try {
+        const imageResponse = await fetch(finalUrl);
+        
+        if (!imageResponse.ok) {
+          console.error('Image fetch failed:', {
+            status: imageResponse.status,
+            statusText: imageResponse.statusText,
+            url: finalUrl
+          });
+          throw new Error(`Failed to fetch image: ${imageResponse.status} ${imageResponse.statusText}`);
+        }
+        
+        const imageBlob = await imageResponse.blob();
+        console.log('Image blob size:', imageBlob.size, 'type:', imageBlob.type);
+        
+        const arrayBuffer = await imageBlob.arrayBuffer();
+        const uint8Array = new Uint8Array(arrayBuffer);
+        
+        // Convert to base64
+        const base64String = btoa(String.fromCharCode(...uint8Array));
+        imageBase64 = base64String;
+        
+        console.log('Image converted to base64, length:', imageBase64.length);
+      } catch (imageError) {
+        console.error('Error fetching/converting image:', imageError);
+        throw new Error(`Failed to process image: ${imageError.message}`);
+      }
+
+      // Call Qwen 2.5 VL for OCR
+      console.log('Calling Qwen 2.5 VL for OCR analysis...');
+      const response = await fetch(`${config.baseUrl}/api/generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ 
-          imageUrl: fileUrlWithTimestamp
+        body: JSON.stringify({
+          model: config.model,
+          prompt: `You are an expert at reading and analyzing menu images. Please extract all text from this menu image and structure it as a JSON object with the following format:
+
+{
+  "restaurantName": "Name of the restaurant (if visible)",
+  "menuSections": [
+    {
+      "sectionName": "Section name (e.g., Appetizers, Main Course, etc.)",
+      "items": [
+        {
+          "name": "Item name",
+          "description": "Item description (if available)",
+          "price": "Price (if available, include currency symbol)"
+        }
+      ]
+    }
+  ],
+  "isMenu": true,
+  "rawText": "All text found in the image"
+}
+
+Focus on:
+1. Accurately extracting all text, especially prices and item names
+2. Properly grouping items by categories/sections
+3. Handling different orientations and languages
+4. Identifying the restaurant name if visible
+5. Being precise with price formatting
+
+If this is not a menu image, set "isMenu": false and include the raw text.`,
+          images: [imageBase64],
+          stream: false
         }),
       });
       
       console.log('Response status:', response.status);
       
       if (!response.ok) {
-        let errorData;
-        try {
-          // Try to parse the error response as JSON
-          errorData = await response.json();
-          console.error('OCR API error:', errorData);
-        } catch (parseError) {
-          // If the response is not valid JSON, get the text instead
-          const errorText = await response.text();
-          console.error('OCR API error (non-JSON):', errorText);
-          
-          // Create a structured error object from the text
-          errorData = {
-            error: 'Failed to parse error response',
-            message: errorText.substring(0, 100) // Only include the first 100 chars to avoid huge errors
-          };
-        }
-        
-        // Throw a more descriptive error
-        const errorMessage = errorData.error || response.statusText;
-        throw new Error(`OCR API error: ${errorMessage}`);
+        const errorText = await response.text();
+        console.error('Qwen VL API error:', errorText);
+        throw new Error(`Qwen VL API error: ${response.statusText}. ${errorText}`);
       }
       
       const data = await response.json();
-      console.log('OCR API response:', data);
+      console.log('Qwen VL API response:', data);
       
-      // Extract text from OCR response format
-      let rawText = '';
-      
-      // Check if the response contains the standard format with pages array
-      if (data.pages && Array.isArray(data.pages)) {
-        console.log('Found pages array with', data.pages.length, 'pages');
-        
-        // Concatenate markdown from all pages
-        for (const page of data.pages) {
-          if (page.markdown) {
-            rawText += page.markdown + '\n\n';
-            console.log('Extracted markdown from page', page.index || 'unknown');
-          }
-        }
-        
-        if (rawText) {
-          console.log('Successfully extracted text from pages');
-        } else {
-          console.warn('Pages array found but no markdown content');
-          // Log the structure of the first page for debugging
-          if (data.pages.length > 0) {
-            console.log('First page structure:', Object.keys(data.pages[0]));
-          }
-        }
-      } 
-      // Fall back to other possible formats
-      else if (data.text) {
-        rawText = data.text;
-        console.log('Text found directly in response.text');
-      } else if (data.rawText) {
-        rawText = data.rawText;
-        console.log('Text found in response.rawText');
-      } else if (data.extractedText) {
-        rawText = data.extractedText;
-        console.log('Text found in response.extractedText');
-      } else if (typeof data === 'string') {
-        rawText = data;
-        console.log('Response is directly a string');
+      // Extract the generated response
+      let rawResponse = '';
+      if (data.response) {
+        rawResponse = data.response;
+      } else if (data.message && data.message.content) {
+        rawResponse = data.message.content;
       } else {
-        console.log('Response structure:', Object.keys(data));
-        console.warn('Could not find text in the response. Using empty string.');
+        console.warn('Unexpected response format from Qwen VL');
+        rawResponse = JSON.stringify(data);
+      }
+      
+      // Parse the JSON response from Qwen VL
+      let enhancedMenuStructure = null;
+      let rawText = '';
+      let menuItems = [];
+      
+      try {
+        // Try to extract JSON from the response
+        const jsonMatch = rawResponse.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          enhancedMenuStructure = JSON.parse(jsonMatch[0]);
+          rawText = enhancedMenuStructure.rawText || rawResponse;
+          
+          // Check if the content was identified as a menu
+          if (enhancedMenuStructure.isMenu === false) {
+            console.warn('Content was not identified as a menu. Using raw text instead.');
+            
+            // Create simple text items from the raw text
+            const lines = rawText.split('\n').filter(line => line.trim());
+            for (const line of lines) {
+              if (line.trim()) {
+                menuItems.push({
+                  name: line.trim(),
+                  category: 'Text Content'
+                });
+              }
+            }
+          } else {
+            // Convert the enhanced structure to menu items
+            menuItems = this.convertEnhancedStructureToMenuItems(enhancedMenuStructure);
+            console.log('Menu items extracted from enhanced structure:', menuItems.length);
+          }
+        } else {
+          // If no JSON found, treat as plain text
+          rawText = rawResponse;
+          menuItems = this.processMenuText(rawText);
+          console.log('Menu items extracted from basic processing:', menuItems.length);
+        }
+      } catch (parseError) {
+        console.error('Error parsing Qwen VL response, falling back to basic processing:', parseError);
+        rawText = rawResponse;
+        menuItems = this.processMenuText(rawText);
+        console.log('Menu items extracted from fallback processing:', menuItems.length);
       }
       
       // Check if there's enough text to process
@@ -143,55 +236,12 @@ export class OCRService {
         throw new Error('No menu text detected in the image. Please try with a clearer menu photo.');
       }
       
-      // Try to use enhanced menu structure analysis
-      let enhancedMenuStructure = null;
-      let menuItems = [];
-      let isMenuContent = true;
-      
-      try {
-        // Call the new menu structure analysis
-        console.log('Attempting enhanced menu structure analysis...');
-        enhancedMenuStructure = await this.analyzeMenuStructure(rawText);
-        console.log('Enhanced menu structure:', enhancedMenuStructure);
-        
-        // Check if the content was identified as a menu
-        if (enhancedMenuStructure && enhancedMenuStructure.isMenu === false) {
-          console.warn('Content was not identified as a menu. Using raw text instead.');
-          isMenuContent = false;
-          
-          // Create simple text items from the raw text
-          const lines = rawText.split('\n').filter(line => line.trim());
-          for (const line of lines) {
-            if (line.trim()) {
-              menuItems.push({
-                name: line.trim(),
-                category: 'Text Content'
-              });
-            }
-          }
-        } else {
-          // Convert the enhanced structure to menu items
-          menuItems = this.convertEnhancedStructureToMenuItems(enhancedMenuStructure);
-          console.log('Menu items extracted from enhanced structure:', menuItems.length);
-        }
-        
-        // If no items were extracted at all, fall back to basic processing
-        if (menuItems.length === 0) {
-          throw new Error('No content could be extracted from the image.');
-        }
-      } catch (analysisError) {
-        console.error('Enhanced menu analysis failed, falling back to basic processing:', analysisError);
-        // Fall back to basic processing if enhanced analysis fails
-        menuItems = this.processMenuText(rawText);
-        console.log('Menu items extracted from basic processing:', menuItems.length);
-        
-        // If basic processing also failed to extract any items, throw an error
-        if (menuItems.length === 0) {
-          throw new Error('No content could be extracted from the image. Please try with a clearer photo.');
-        }
+      // If no items were extracted at all, throw an error
+      if (menuItems.length === 0) {
+        throw new Error('No content could be extracted from the image. Please try with a clearer photo.');
       }
       
-      // Extract restaurant name from enhanced structure if available
+      // Extract restaurant name
       let restaurantName = "Unknown Restaurant";
       
       // First try to get the name from the enhanced structure
@@ -216,10 +266,10 @@ export class OCRService {
         restaurantName,
         enhancedStructure: enhancedMenuStructure,
         debug: {
-          model: data.model || 'ocr-latest',
+          model: config.model,
           textLength: rawText.length,
           extractedItems: menuItems.length,
-          processingTimeMs: data.processingTimeMs || 0,
+          processingTimeMs: data.eval_duration || 0,
           enhancedAnalysis: !!enhancedMenuStructure
         }
       };
@@ -245,6 +295,8 @@ export class OCRService {
       if (error instanceof Error) {
         if (error.message.includes('timeout') || error.message.includes('timed out')) {
           userMessage = 'The OCR processing timed out. Please try again with a clearer image or try later.';
+        } else if (error.message.includes('ECONNREFUSED') || error.message.includes('Connection refused')) {
+          userMessage = 'Cannot connect to Qwen VL service. Please ensure Qwen 2.5 VL is running locally on port 11434.';
         } else if (error.message.includes('rate limit')) {
           userMessage = 'OCR service rate limit exceeded. Please try again in a few minutes.';
         } else if (error.message.includes('Failed to parse error response')) {
@@ -393,47 +445,10 @@ export class OCRService {
     }
   }
   
-  /**
-   * Enhanced menu structure analysis using LLM
-   * @param rawText Raw OCR text
-   * @returns Structured menu data with sections and items
-   */
-  static async analyzeMenuStructure(rawText: string): Promise<any> {
-    try {
-      // Get the appropriate URL based on deployment environment
-      const isVercel = typeof window !== 'undefined' && 
-                      (window.location.hostname.includes('vercel.app') || 
-                       window.location.hostname.includes('vercel-analytics'));
-      
-      const analysisUrl = isVercel ? '/api/menu-structure-analysis' : '/.netlify/functions/menu-structure-analysis';
-      
-      console.log('Calling menu structure analysis at:', analysisUrl);
-      const response = await fetch(analysisUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          ocrText: rawText
-        }),
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Menu structure analysis failed: ${response.statusText}. ${errorText}`);
-      }
-      
-      const data = await response.json();
-      return data.menuStructure;
-    } catch (error) {
-      console.error('Menu structure analysis error:', error);
-      throw error;
-    }
-  }
   
   /**
    * Convert the enhanced menu structure to the MenuOCRResult format
-   * @param enhancedStructure The enhanced menu structure from LLM analysis
+   * @param enhancedStructure The enhanced menu structure from Qwen VL analysis
    * @returns Menu items in the format expected by the application
    */
   private static convertEnhancedStructureToMenuItems(enhancedStructure: any): MenuOCRResult['menuItems'] {
@@ -451,10 +466,10 @@ export class OCRService {
         if (section.items && Array.isArray(section.items)) {
           for (const item of section.items) {
             menuItems.push({
-              name: item.name,
+              name: item.name || '',
               price: item.price || '',
               description: item.description || '',
-              category: section.sectionName
+              category: section.sectionName || 'Uncategorized'
             });
           }
         }

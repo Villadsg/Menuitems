@@ -59,6 +59,194 @@
   let currentPage = 'beginSection';
   $: userId = $user?.id || 'anonymous';
   
+  /** Process image directly with OCR without uploading to storage (for anonymous users) */
+  const processImageDirectly = async (file: File): Promise<OCRResult> => {
+    try {
+      // Convert file to base64
+      const arrayBuffer = await file.arrayBuffer();
+      const uint8Array = new Uint8Array(arrayBuffer);
+      const base64String = btoa(String.fromCharCode(...uint8Array));
+      
+      // Call Qwen 2.5 VL directly
+      const response = await fetch('http://localhost:11434/api/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'qwen2.5vl:7b',
+          prompt: `You are an expert at reading and analyzing menu images. Please extract all text from this menu image and structure it as a JSON object with the following format:
+
+{
+  "restaurantName": "Name of the restaurant (if visible)",
+  "menuSections": [
+    {
+      "sectionName": "Section name (e.g., Appetizers, Main Course, etc.)",
+      "items": [
+        {
+          "name": "Item name",
+          "description": "Item description (if available)",
+          "price": "Price (if available, include currency symbol)"
+        }
+      ]
+    }
+  ],
+  "isMenu": true,
+  "rawText": "All text found in the image"
+}
+
+Focus on:
+1. Accurately extracting all text, especially prices and item names
+2. Properly grouping items by categories/sections
+3. Handling different orientations and languages
+4. Identifying the restaurant name if visible
+5. Being precise with price formatting
+
+If this is not a menu image, set "isMenu": false and include the raw text.`,
+          images: [base64String],
+          stream: false
+        }),
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`OCR API error: ${response.statusText}. ${errorText}`);
+      }
+      
+      const data = await response.json();
+      
+      // Extract the generated response
+      let rawResponse = data.response || data.message?.content || JSON.stringify(data);
+      
+      // Parse the JSON response
+      let enhancedMenuStructure = null;
+      let rawText = '';
+      let menuItems = [];
+      
+      try {
+        const jsonMatch = rawResponse.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          enhancedMenuStructure = JSON.parse(jsonMatch[0]);
+          rawText = enhancedMenuStructure.rawText || rawResponse;
+          
+          if (enhancedMenuStructure.isMenu === false) {
+            // Create simple text items from raw text
+            const lines = rawText.split('\n').filter(line => line.trim());
+            for (const line of lines) {
+              if (line.trim()) {
+                menuItems.push({
+                  name: line.trim(),
+                  category: 'Text Content'
+                });
+              }
+            }
+          } else {
+            // Convert enhanced structure to menu items
+            menuItems = convertEnhancedStructureToMenuItems(enhancedMenuStructure);
+          }
+        } else {
+          // Fallback to basic text processing
+          rawText = rawResponse;
+          menuItems = processBasicMenuText(rawText);
+        }
+      } catch (parseError) {
+        console.error('Error parsing OCR response:', parseError);
+        rawText = rawResponse;
+        menuItems = processBasicMenuText(rawText);
+      }
+      
+      // Extract restaurant name
+      let restaurantName = "Unknown Restaurant";
+      if (enhancedMenuStructure && enhancedMenuStructure.restaurantName) {
+        restaurantName = enhancedMenuStructure.restaurantName;
+      }
+      
+      return {
+        rawText,
+        menuItems,
+        restaurantName,
+        enhancedStructure: enhancedMenuStructure,
+        debug: {
+          model: 'qwen2.5vl:7b',
+          textLength: rawText.length,
+          extractedItems: menuItems.length,
+          enhancedAnalysis: !!enhancedMenuStructure
+        }
+      };
+    } catch (error) {
+      console.error('Direct OCR processing error:', error);
+      throw error;
+    }
+  };
+  
+  /** Convert enhanced structure to menu items */
+  const convertEnhancedStructureToMenuItems = (enhancedStructure: any): MenuItem[] => {
+    const menuItems: MenuItem[] = [];
+    
+    if (enhancedStructure && enhancedStructure.menuSections) {
+      for (const section of enhancedStructure.menuSections) {
+        if (section.items && Array.isArray(section.items)) {
+          for (const item of section.items) {
+            menuItems.push({
+              name: item.name || '',
+              price: item.price || '',
+              description: item.description || '',
+              category: section.sectionName || 'Uncategorized'
+            });
+          }
+        }
+      }
+    }
+    
+    return menuItems;
+  };
+  
+  /** Process basic menu text */
+  const processBasicMenuText = (text: string): MenuItem[] => {
+    if (!text || text.trim().length < 20) {
+      return [];
+    }
+    
+    const lines = text.split('\n').filter(line => line.trim());
+    if (lines.length < 3) {
+      return [];
+    }
+    
+    const menuItems: MenuItem[] = [];
+    let currentCategory = 'Uncategorized';
+    
+    for (const line of lines) {
+      const priceMatch = line.match(/\$\d+\.\d{2}|\d+\.\d{2}€|\d+\.\d{2}/);
+      
+      if (line.match(/^[A-Z\s]+$/) || line.endsWith(':')) {
+        currentCategory = line.trim().replace(/:$/, '');
+        menuItems.push({
+          name: currentCategory,
+          category: currentCategory
+        });
+      } else if (priceMatch) {
+        const price = priceMatch[0];
+        const priceIndex = priceMatch.index || 0;
+        const name = line.substring(0, priceIndex).trim();
+        const description = line.substring(priceIndex + price.length).trim();
+        
+        menuItems.push({
+          name,
+          price,
+          description,
+          category: currentCategory
+        });
+      } else if (line.trim()) {
+        menuItems.push({
+          name: line.trim(),
+          category: currentCategory
+        });
+      }
+    }
+    
+    return menuItems;
+  };
+  
   /** Function to extract coordinates from EXIF metadata */
   const extractPhotoCoordinates = async (file: File) => {
     try {
@@ -127,21 +315,27 @@
       ocrResult = null;
    
       
-      // Upload the file temporarily to get a file ID
-      const fileToUpload = compressedFile || filesMainPhoto?.[0];
-      
-      const uploadResponse = await SupabaseService.uploadFile(fileToUpload, bucketId);
-      
-      // Store the file ID for feedback collection
-      photoFileId = uploadResponse.path;
-      
-      // Process the image with OCR
-      const ocrResultResponse = await OCRService.processMenuImage(uploadResponse.path, bucketId);
-      ocrResult = ocrResultResponse;
+      // For anonymous users, process image directly without uploading to storage
+      if (!$user) {
+        // Process the image with OCR directly using base64
+        const fileToProcess = compressedFile || filesMainPhoto?.[0];
+        ocrResult = await processImageDirectly(fileToProcess);
+      } else {
+        // For authenticated users, upload the file and process via storage
+        const fileToUpload = compressedFile || filesMainPhoto?.[0];
+        
+        const uploadResponse = await SupabaseService.uploadFile(fileToUpload, bucketId);
+        
+        // Store the file ID for feedback collection
+        photoFileId = uploadResponse.path;
+        
+        // Process the image with OCR
+        ocrResult = await OCRService.processMenuImage(uploadResponse.path, bucketId);
+      }
       
       // Initialize editable menu items with the OCR results
-      if (ocrResultResponse && ocrResultResponse.menuItems) {
-        const itemsWithIds = JSON.parse(JSON.stringify(ocrResultResponse.menuItems));
+      if (ocrResult && ocrResult.menuItems) {
+        const itemsWithIds = JSON.parse(JSON.stringify(ocrResult.menuItems));
         
         // Ensure each menu item has a stable ID
         itemsWithIds.forEach((item: MenuItem) => {
@@ -154,28 +348,28 @@
       }
       
       // Autofill restaurant name if available
-      if (ocrResultResponse && ocrResultResponse.restaurantName) {
+      if (ocrResult && ocrResult.restaurantName) {
         // Check if we have a valid restaurant name
-        if (ocrResultResponse.restaurantName !== "Unknown Restaurant") {
+        if (ocrResult.restaurantName !== "Unknown Restaurant") {
           // Handle multiple possible names (separated by OR)
-          if (ocrResultResponse.restaurantName.includes(" OR ")) {
-            const possibleNames = ocrResultResponse.restaurantName.split(" OR ");
+          if (ocrResult.restaurantName.includes(" OR ")) {
+            const possibleNames = ocrResult.restaurantName.split(" OR ");
             // Use the first name as default
             routeName = possibleNames[0].trim();
             toasts.info(`Multiple possible restaurant names detected. Using "${routeName}"`);
           } else {
-            routeName = ocrResultResponse.restaurantName;
+            routeName = ocrResult.restaurantName;
             toasts.info(`Restaurant name "${routeName}" detected from menu image`);
           }
         }
       }
       
       // Log OCR data for debugging
-      if (ocrResultResponse && ocrResultResponse.rawText) {
+      if (ocrResult && ocrResult.rawText) {
         
         // Show which model was used and quality metrics
-        if (ocrResultResponse.debug) {
-          const debug = ocrResultResponse.debug;
+        if (ocrResult.debug) {
+          const debug = ocrResult.debug;
           
           if (debug.model) {
             // Get quality indicator based on extracted items
@@ -273,24 +467,29 @@
         menuItems: updatedMenuItems
       };
       
-      // Store the feedback for learning purposes
-      try {
-        // Create a feedback document with original and corrected data
-        await SupabaseService.createDocument('menu_ocr_feedback', {
-          original_items: JSON.stringify(originalMenuItems),
-          corrected_items: JSON.stringify(editableMenuItems),
-          raw_text: ocrResult.rawText,
-          restaurant_name: routeName,
-          image_id: photoFileId || '',
-          user_id: userId,
-          timestamp: new Date().toISOString(),
-          menu_structure: ocrResult.enhancedStructure ? JSON.stringify(ocrResult.enhancedStructure) : null
-        });
-        console.log('Menu OCR feedback saved for learning');
-        toasts.success("Menu items updated successfully. Your edits will help improve future menu recognition");
-      } catch (error) {
-        console.error('Failed to save menu OCR feedback:', error);
-        // Still update the UI even if feedback saving fails
+      // Store the feedback for learning purposes (only for authenticated users)
+      if ($user) {
+        try {
+          // Create a feedback document with original and corrected data
+          await SupabaseService.createDocument('menu_ocr_feedback', {
+            original_items: JSON.stringify(originalMenuItems),
+            corrected_items: JSON.stringify(editableMenuItems),
+            raw_text: ocrResult.rawText,
+            restaurant_name: routeName,
+            image_id: photoFileId || '',
+            user_id: userId,
+            timestamp: new Date().toISOString(),
+            menu_structure: ocrResult.enhancedStructure ? JSON.stringify(ocrResult.enhancedStructure) : null
+          });
+          console.log('Menu OCR feedback saved for learning');
+          toasts.success("Menu items updated successfully. Your edits will help improve future menu recognition");
+        } catch (error) {
+          console.error('Failed to save menu OCR feedback:', error);
+          // Still update the UI even if feedback saving fails
+          toasts.success("Menu items updated successfully");
+        }
+      } else {
+        // For anonymous users, just show success message
         toasts.success("Menu items updated successfully");
       }
       
@@ -431,12 +630,19 @@
       }
       
       loading = true;
-      const mainPhotoFileId = await uploadMainPhoto();
       
-      if (!mainPhotoFileId) {
-        toasts.error('Failed to upload photo');
-        loading = false;
-        return;
+      // For anonymous users, we don't upload the photo to storage
+      let mainPhotoFileId = null;
+      if ($user) {
+        mainPhotoFileId = await uploadMainPhoto();
+        if (!mainPhotoFileId) {
+          toasts.error('Failed to upload photo');
+          loading = false;
+          return;
+        }
+      } else {
+        // For anonymous users, we just use a placeholder or the file name
+        mainPhotoFileId = `anonymous_upload_${Date.now()}`;
       }
       
       // Create the document in the database
