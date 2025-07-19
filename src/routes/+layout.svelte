@@ -42,36 +42,36 @@
 
 <!-- Add Google Fonts -->
 <svelte:head>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <!-- Font Awesome -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
 </svelte:head>
 
-<div class="min-h-screen bg-gray-50 flex flex-col">
-  <header class="bg-white bg-opacity-90 backdrop-blur-sm shadow-sm fixed top-0 left-0 right-0 z-30">
-    <div class="container mx-auto px-4">
-      <div class="flex justify-between items-center h-16">
-        <a href="/" class="flex items-center space-x-2" aria-label="MenuMap Home">
-          <img src="/log35.png" class="h-10 w-10" alt="MenuMap Logo" />
-          <span class="text-xl font-bold text-gray-600">MenuMap</span>
+<div class="min-h-screen bg-white flex flex-col">
+  <header class="bg-white/95 backdrop-blur-sm border-b border-gray-100/50 fixed top-0 left-0 right-0 z-30">
+    <div class="container mx-auto px-6">
+      <div class="flex justify-between items-center h-18">
+        <a href="/" class="flex items-center space-x-3" aria-label="MenuMap Home">
+          <img src="/log35.png" class="h-8 w-8" alt="MenuMap Logo" />
+          <span class="text-xl font-light text-gray-900 tracking-tight">MenuMap</span>
         </a>
         
-        <nav class="hidden md:flex items-center space-x-6">
+        <nav class="hidden md:flex items-center space-x-8">
           {#if $user}
-            <a href="/create-quiz" class="text-gray-700 hover:text-gray-600 transition-colors">Add menu items</a>
-            <a href="/find-quiz" class="text-gray-700 hover:text-gray-600 transition-colors">Find menu items</a>
-            <a href="/profile" class="text-gray-700 hover:text-gray-600 transition-colors">Profile</a>
+            <a href="/create-quiz" class="text-sm text-stone-600 hover:text-stone-800 transition-colors font-medium tracking-wide">Add menu items</a>
+            <a href="/find-quiz" class="text-sm text-stone-600 hover:text-stone-800 transition-colors font-medium tracking-wide">Find menu items</a>
+            <a href="/profile" class="text-sm text-stone-600 hover:text-stone-800 transition-colors font-medium tracking-wide">Profile</a>
             <button 
               on:click={logout} 
-              class="bg-gray-600 hover:bg-gray-700 text-white py-2 px-4 rounded-lg transition-colors"
+              class="bg-orange-400 hover:bg-orange-500 text-white py-2.5 px-6 rounded-xl transition-all duration-200 font-medium text-sm tracking-wide"
             >
               Logout
             </button>
           {:else}
-            <a href="/login" class="text-gray-700 hover:text-gray-600 transition-colors">Login</a>
+            <a href="/login" class="text-sm text-stone-600 hover:text-stone-800 transition-colors font-medium tracking-wide">Login</a>
             <a 
               href="/signup" 
-              class="bg-gray-600 hover:bg-gray-700 text-white py-2 px-4 rounded-lg transition-colors"
+              class="bg-orange-400 hover:bg-orange-500 text-white py-2.5 px-6 rounded-xl transition-all duration-200 font-medium text-sm tracking-wide"
             >
               Sign Up
             </a>
@@ -80,13 +80,13 @@
         
         <!-- Mobile menu button -->
         <button 
-          class="md:hidden rounded-full p-2 text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-500"
+          class="md:hidden rounded-xl p-2.5 text-stone-600 hover:bg-stone-100 focus:outline-none transition-colors"
           on:click={toggleMenu}
           aria-expanded={isMenuOpen}
           aria-label="Toggle menu"
         >
-          <svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+          <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/>
           </svg>
         </button>
       </div>
@@ -96,48 +96,48 @@
     {#if isMenuOpen}
       <div 
         transition:fly={{ y: -20, duration: 200 }}
-        class="md:hidden bg-white border-t border-gray-100 shadow-lg"
+        class="md:hidden bg-white/95 backdrop-blur-sm border-t border-gray-100/50"
       >
-        <div class="container mx-auto px-4 py-3 space-y-1">
+        <div class="container mx-auto px-6 py-4 space-y-2">
           {#if $user}
             <a 
               href="/create-quiz" 
-              class="block py-2 px-4 text-gray-700 hover:bg-gray-50 rounded-md"
+              class="block py-3 px-4 text-sm text-stone-600 hover:text-stone-800 hover:bg-stone-50 rounded-xl font-medium tracking-wide transition-colors"
               on:click={closeMenu}
             >
               Add menu items
             </a>
             <a 
               href="/find-quiz" 
-              class="block py-2 px-4 text-gray-700 hover:bg-gray-50 rounded-md"
+              class="block py-3 px-4 text-sm text-stone-600 hover:text-stone-800 hover:bg-stone-50 rounded-xl font-medium tracking-wide transition-colors"
               on:click={closeMenu}
             >
               Find menu items
             </a>
             <a 
               href="/profile" 
-              class="block py-2 px-4 text-gray-700 hover:bg-gray-50 rounded-md"
+              class="block py-3 px-4 text-sm text-stone-600 hover:text-stone-800 hover:bg-stone-50 rounded-xl font-medium tracking-wide transition-colors"
               on:click={closeMenu}
             >
               Profile
             </a>
             <button 
               on:click={() => { closeMenu(); logout(); }}
-              class="w-full text-left py-2 px-4 text-gray-700 hover:bg-gray-50 rounded-md"
+              class="w-full text-left py-3 px-4 text-sm bg-orange-400 text-white rounded-xl font-medium tracking-wide mt-4"
             >
               Logout
             </button>
           {:else}
             <a 
               href="/login" 
-              class="block py-2 px-4 text-gray-700 hover:bg-gray-50 rounded-md"
+              class="block py-3 px-4 bg-stone-100 text-sm hover:text-stone-800 hover:bg-stone-50 rounded-xl font-medium tracking-wide transition-colors"
               on:click={closeMenu}
             >
               Login
             </a>
             <a 
               href="/signup" 
-              class="block py-2 px-4 text-gray-700 hover:bg-gray-50 rounded-md"
+              class="block bg-stone-100 py-3 px-4 text-sm rounded-xl font-medium tracking-wide mt-4"
               on:click={closeMenu}
             >
               Sign Up
@@ -148,42 +148,42 @@
     {/if}
   </header>
 
-  <main class="flex-grow pt-16">
+  <main class="flex-grow pt-18">
     <slot />
   </main>
 
-  <footer class="bg-gray-800 text-white py-8">
-    <div class="container mx-auto px-4">
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+  <footer class="bg-gray-900 text-white py-12">
+    <div class="container mx-auto px-6">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-12">
         <div>
-          <h3 class="text-xl font-bold mb-4">MenuMap</h3>
-          <p class="text-gray-300">Discover local menus in one place. Browse and compare menu content from restaurants around you.</p>
+          <h3 class="text-lg font-light mb-6 tracking-tight">MenuMap</h3>
+          <p class="text-gray-400 font-light leading-relaxed text-sm">Discover local menus in one place. Browse and compare menu content from restaurants around you.</p>
         </div>
         <div>
-          <h3 class="text-xl font-bold mb-4">Quick Links</h3>
-          <ul class="space-y-2">
-            <li><a href="/" class="text-gray-300 hover:text-white transition-colors">Home</a></li>
-            <li><a href="/about" class="text-gray-300 hover:text-white transition-colors">About</a></li>
-            <li><a href="/how-to" class="text-gray-300 hover:text-white transition-colors">How It Works</a></li>
+          <h3 class="text-lg font-light mb-6 tracking-tight">Quick Links</h3>
+          <ul class="space-y-3">
+            <li><a href="/" class="text-gray-400 hover:text-white transition-colors text-sm font-light">Home</a></li>
+            <li><a href="/about" class="text-gray-400 hover:text-white transition-colors text-sm font-light">About</a></li>
+            <li><a href="/how-to" class="text-gray-400 hover:text-white transition-colors text-sm font-light">How It Works</a></li>
           </ul>
         </div>
         <div>
-          <h3 class="text-xl font-bold mb-4">Connect With Us</h3>
+          <h3 class="text-lg font-light mb-6 tracking-tight">Connect With Us</h3>
           <div class="flex space-x-4">
-            <a href="#" class="text-gray-300 hover:text-white transition-colors">
-              <i class="fab fa-twitter text-xl"></i>
+            <a href="#" class="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-700 transition-all duration-200">
+              <i class="fab fa-twitter text-sm"></i>
             </a>
-            <a href="#" class="text-gray-300 hover:text-white transition-colors">
-              <i class="fab fa-facebook text-xl"></i>
+            <a href="#" class="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-700 transition-all duration-200">
+              <i class="fab fa-facebook text-sm"></i>
             </a>
-            <a href="#" class="text-gray-300 hover:text-white transition-colors">
-              <i class="fab fa-instagram text-xl"></i>
+            <a href="#" class="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-700 transition-all duration-200">
+              <i class="fab fa-instagram text-sm"></i>
             </a>
           </div>
         </div>
       </div>
-      <div class="border-t border-gray-700 mt-8 pt-8 text-center text-gray-400">
-        <p>&copy; {new Date().getFullYear()} MenuMap. All rights reserved.</p>
+      <div class="border-t border-gray-800 mt-12 pt-8 text-center">
+        <p class="text-gray-500 text-sm font-light">&copy; {new Date().getFullYear()} MenuMap. All rights reserved.</p>
       </div>
     </div>
   </footer>
@@ -193,12 +193,14 @@
 
 <style>
   :global(body) {
-    font-family: 'Poppins', sans-serif;
-    color: #212121;
+    font-family: 'Inter', 'Poppins', sans-serif;
+    color: #111827;
+    font-weight: 400;
   }
   
   :global(h1, h2, h3, h4, h5, h6) {
-    font-family: 'Poppins', sans-serif;
-    font-weight: 600;
+    font-family: 'Inter', 'Poppins', sans-serif;
+    font-weight: 300;
+    letter-spacing: -0.025em;
   }
 </style>

@@ -40,17 +40,17 @@
     {
       icon: 'fas fa-utensils',
       title: 'Local Menus as one Menu',
-      description: 'Find and browse menu content from restaurants in your area and see it as just one big menu'
+      description: 'Filter and find menu content from restaurants in your area and see it as just one big menu'
     },
     {
       icon: 'fas fa-language',
       title: 'Multi-Language Support',
-      description: 'View menus in multiple languages including English, Spanish, Italian, Danish, and Japanese.'
+      description: 'View menu content in original language or translated'
     },
     {
       icon: 'fas fa-share-alt',
-      title: 'Share Your Menu',
-      description: 'Restaurant owners can add and update their menu content for customers to discover.'
+      title: 'Share A Menu',
+      description: 'Share or update menu content for customers to discover and get discounts'
     }
   ];
 
@@ -83,38 +83,42 @@
 {:then user}
   {#if user}
     <!-- Show Map component when logged in -->
-    <div class="min-h-screen bg-gradient-to-br from-slate-50 to-gray-100">
-      <div class="container mx-auto px-4 py-8">
-        <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 mb-8 border border-white/20">
-          <h1 class="text-2xl font-bold mb-4 text-gray-800">Welcome back!</h1>
-          <p class="text-gray-600 mb-6">Explore menus from restaurants around you or add your own menu items.</p>
+    <div class="min-h-screen bg-gradient-to-br from-gray-50 to-white">
+      <div class="container mx-auto px-6 py-12">
+        <div class="bg-white/90 backdrop-blur-sm rounded-3xl shadow-sm p-8 mb-12 border border-gray-100/50">
+          <h1 class="text-3xl font-light mb-6 text-gray-900 tracking-tight">Welcome back!</h1>
+          <p class="text-lg text-gray-600 mb-8 font-light leading-relaxed">Explore menus from restaurants around you or add your own menu items.</p>
           
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <a href="/find-quiz" class="block">
-              <div class="bg-gradient-to-r from-gray-50 to-gray-100 hover:from-gray-100 hover:to-gray-200 transition-all duration-300 p-6 rounded-2xl border border-gray-200 flex items-center shadow-md hover:shadow-lg">
-                <i class="fas fa-search text-3xl text-gray-500 mr-4"></i>
-                <div>
-                  <h3 class="text-xl font-semibold text-gray-800">Find Menu Items</h3>
-                  <p class="text-gray-600">Browse and discover menu items near you</p>
+          <div class="flex flex-col sm:flex-row gap-4">
+            <a href="/find-quiz" class="flex-1">
+              <div class="bg-white hover:bg-gray-50 transition-all duration-200 p-6 rounded-2xl border border-gray-200/60 hover:border-gray-300/80 shadow-sm hover:shadow-md group">
+                <div class="flex items-center justify-center mb-4">
+                  <div class="w-12 h-12 bg-orange-400 rounded-full flex items-center justify-center group-hover:scale-105 transition-transform duration-200">
+                    <i class="fas fa-search text-white text-lg"></i>
+                  </div>
                 </div>
+                <h3 class="text-lg font-medium text-gray-900 text-center mb-2">Find Menu Items</h3>
+                <p class="text-sm text-gray-600 text-center font-light">Browse and discover menu items near you</p>
               </div>
             </a>
             
-            <a href="/create-quiz" class="block">
-              <div class="bg-gradient-to-r from-slate-50 to-slate-100 hover:from-slate-100 hover:to-slate-200 transition-all duration-300 p-6 rounded-2xl border border-slate-200 flex items-center shadow-md hover:shadow-lg">
-                <i class="fas fa-plus-circle text-3xl text-slate-500 mr-4"></i>
-                <div>
-                  <h3 class="text-xl font-semibold text-gray-800">Add Menu Items</h3>
-                  <p class="text-gray-600">Share your restaurant's menu with others</p>
+            <a href="/create-quiz" class="flex-1">
+              <div class="bg-white hover:bg-gray-50 transition-all duration-200 p-6 rounded-2xl border border-gray-200/60 hover:border-gray-300/80 shadow-sm hover:shadow-md group">
+                <div class="flex items-center justify-center mb-4">
+                  <div class="w-12 h-12 bg-orange-400 rounded-full flex items-center justify-center group-hover:scale-105 transition-transform duration-200">
+                    <i class="fas fa-plus-circle text-white text-lg"></i>
+                  </div>
                 </div>
+                <h3 class="text-lg font-medium text-gray-900 text-center mb-2">Add Menu Items</h3>
+                <p class="text-sm text-gray-600 text-center font-light">Share your restaurant's menu with others</p>
               </div>
             </a>
           </div>
         </div>
         
-        <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-white/20">
-          <h2 class="text-2xl font-bold mb-4 text-gray-800">Nearby menus</h2>
-          <div class="h-96 w-full rounded-xl overflow-hidden">
+        <div class="bg-white/90 backdrop-blur-sm rounded-3xl shadow-sm p-8 border border-gray-100/50">
+          <h2 class="text-2xl font-light mb-6 text-gray-900 tracking-tight">Nearby menus</h2>
+          <div class="h-96 w-full rounded-2xl overflow-hidden">
             <Map />
           </div>
         </div>
@@ -122,27 +126,27 @@
     </div>
   {:else}
     <!-- Hero Section -->
-    <div class="min-h-screen bg-gradient-to-br from-slate-50 to-gray-100 flex items-center justify-center">
-      <div class="text-center max-w-md mx-auto px-4">
-        <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-8 border border-white/20">
-          <h1 class="text-5xl font-bold mb-4 text-gray-800">Menu content near you</h1>
-          <p class="text-xl mb-8 text-gray-600">Browse and compare menu content from places around you</p>
-          <div class="flex flex-col space-y-4">
+    <div class="min-h-screen bg-gradient-to-br from-gray-50 to-white flex items-center justify-center">
+      <div class="text-center max-w-lg mx-auto px-6">
+        <div class="bg-white/90 backdrop-blur-sm rounded-3xl shadow-sm p-12 border border-gray-100/50">
+          <h1 class="text-4xl font-light mb-6 text-gray-900 tracking-tight leading-tight">Menu content near you</h1>
+          <p class="text-lg mb-12 text-gray-600 font-light leading-relaxed">Browse and compare menu content from places around you</p>
+          <div class="flex flex-col space-y-3">
             <a href="/find-quiz">
-              <button class="bg-gray-600 hover:bg-gray-700 text-white py-3 px-6 rounded-full w-full flex items-center justify-center transition-all duration-300 shadow-md hover:shadow-lg">
-                <i class="fas fa-search mr-2"></i> Browse Menu Content
+              <button class="bg-stone-100 py-4 px-8 hover:bg-stone-200 rounded-xl w-full flex items-center justify-center transition-all duration-200 shadow-sm hover:shadow-md font-medium text-sm tracking-wide">
+                <i class="fas fa-search mr-3"></i> Browse Menu Content
               </button>
             </a>
             
             <a href="/create-quiz">
-              <button class="bg-gray-500 hover:bg-gray-600 text-white py-3 px-6 rounded-full w-full flex items-center justify-center transition-all duration-300 shadow-md hover:shadow-lg">
-                <i class="fas fa-plus-circle mr-2"></i> Add Your Menu
+              <button class="bg-stone-100 hover:bg-stone-200 text-stone-700 py-4 px-8 rounded-xl w-full flex items-center justify-center transition-all duration-200 shadow-sm hover:shadow-md font-medium text-sm tracking-wide">
+                <i class="fas fa-plus-circle mr-3"></i> Add Your Menu
               </button>
             </a>
             
             <a href="/signup">
-              <button class="bg-gray-100 text-gray-700 hover:bg-gray-200 py-3 px-6 rounded-full w-full flex items-center justify-center transition-all duration-300 shadow-sm hover:shadow-md">
-                <i class="fas fa-user-plus mr-2"></i> Sign Up Free
+              <button class="bg-transparent border border-stone-200 hover:border-stone-300 text-stone-600 hover:text-stone-700 py-4 px-8 rounded-xl w-full flex items-center justify-center transition-all duration-200 hover:bg-stone-50 font-medium text-sm tracking-wide">
+                <i class="fas fa-user-plus mr-3"></i> Sign Up Free
               </button>
             </a>
           </div>
@@ -151,18 +155,18 @@
     </div>
 
     <!-- Features Section -->
-    <section class="py-16 bg-gradient-to-r from-gray-50 to-slate-50">
-      <div class="container mx-auto px-4">
-        <h2 class="text-3xl font-bold text-center mb-12 text-gray-800">Why Choose MenuMap?</h2>
+    <section class="py-20 bg-white">
+      <div class="container mx-auto px-6">
+        <h2 class="text-3xl font-light text-center mb-16 text-gray-900 tracking-tight">Why Choose MenuMap?</h2>
         
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-5xl mx-auto">
           {#each features as feature}
-            <div in:fade={{ delay: 200, duration: 300 }} class="bg-white/80 backdrop-blur-sm rounded-2xl p-6 text-center hover:shadow-lg transition-all duration-300 border border-white/20">
-              <div class="bg-gradient-to-r from-gray-100 to-slate-100 text-gray-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <i class="{feature.icon} text-2xl"></i>
+            <div in:fade={{ delay: 200, duration: 300 }} class="bg-stone-50/50 rounded-2xl p-8 text-center hover:bg-stone-50 transition-all duration-200 border border-stone-100/50">
+              <div class="w-14 h-14 bg-orange-400 rounded-full flex items-center justify-center mx-auto mb-6">
+                <i class="{feature.icon} text-white text-lg"></i>
               </div>
-              <h3 class="text-xl font-semibold mb-2 text-gray-800">{feature.title}</h3>
-              <p class="text-gray-600">{feature.description}</p>
+              <h3 class="text-lg font-medium mb-4 text-stone-800">{feature.title}</h3>
+              <p class="text-sm text-stone-600 font-light leading-relaxed">{feature.description}</p>
             </div>
           {/each}
         </div>
@@ -170,32 +174,32 @@
     </section>
 
     <!-- How It Works Section -->
-    <section class="py-16 bg-white">
-      <div class="container mx-auto px-4">
-        <h2 class="text-3xl font-bold text-center mb-12 text-gray-800">How It Works</h2>
+    <section class="py-20 bg-gray-50/30">
+      <div class="container mx-auto px-6">
+        <h2 class="text-3xl font-light text-center mb-16 text-gray-900 tracking-tight">How It Works</h2>
         
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto">
           {#each steps as step, i}
             <div in:fly={{ y: 20, delay: i * 150, duration: 300 }} class="relative">
-              <div class="bg-gradient-to-br from-slate-50 to-gray-50 rounded-2xl p-8 shadow-lg relative z-10 h-full border border-gray-100">
-                <div class="bg-gradient-to-r from-gray-600 to-slate-600 text-white w-12 h-12 rounded-full flex items-center justify-center text-xl font-bold mb-4">
+              <div class="bg-white rounded-2xl p-8 shadow-sm relative z-10 h-full border border-stone-100/50">
+                <div class="w-10 h-10 bg-orange-400 text-white rounded-full flex items-center justify-center text-sm font-medium mb-6">
                   {step.number}
                 </div>
-                <h3 class="text-xl font-semibold mb-2 text-gray-800">{step.title}</h3>
-                <p class="text-gray-600">{step.description}</p>
+                <h3 class="text-lg font-medium mb-4 text-stone-800">{step.title}</h3>
+                <p class="text-sm text-stone-600 font-light leading-relaxed">{step.description}</p>
               </div>
               
               {#if i < steps.length - 1}
-                <div class="hidden md:block absolute top-1/2 right-0 w-1/2 h-0.5 bg-gradient-to-r from-gray-300 to-slate-300 z-0"></div>
+                <div class="hidden md:block absolute top-1/2 right-0 w-1/2 h-px bg-stone-200 z-0"></div>
               {/if}
             </div>
           {/each}
         </div>
         
-        <div class="text-center mt-12">
-          <a href="/signup" class="bg-gradient-to-r from-gray-600 to-slate-600 hover:from-gray-700 hover:to-slate-700 text-white py-3 px-8 rounded-full inline-flex items-center transition-all duration-300 shadow-lg hover:shadow-xl">
+        <div class="text-center mt-16">
+          <a href="/signup" class="bg-orange-400 hover:bg-orange-500 text-white py-4 px-10 rounded-xl inline-flex items-center transition-all duration-200 shadow-sm hover:shadow-md font-medium text-sm tracking-wide">
             <span>Get Started Now</span>
-            <i class="fas fa-arrow-right ml-2"></i>
+            <i class="fas fa-arrow-right ml-3"></i>
           </a>
         </div>
       </div>
