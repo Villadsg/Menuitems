@@ -63,7 +63,7 @@
             <a href="/profile" class="text-sm text-stone-600 hover:text-stone-800 transition-colors font-medium tracking-wide">Profile</a>
             <button 
               on:click={logout} 
-              class="bg-orange-400 hover:bg-orange-500 text-white py-2.5 px-6 rounded-xl transition-all duration-200 font-medium text-sm tracking-wide"
+              class="bg-stone-200 hover:bg-orange-500 py-2.5 px-6 rounded-xl transition-all duration-200 font-medium text-sm tracking-wide"
             >
               Logout
             </button>
@@ -71,7 +71,7 @@
             <a href="/login" class="text-sm text-stone-600 hover:text-stone-800 transition-colors font-medium tracking-wide">Login</a>
             <a 
               href="/signup" 
-              class="bg-orange-400 hover:bg-orange-500 text-white py-2.5 px-6 rounded-xl transition-all duration-200 font-medium text-sm tracking-wide"
+              class="bg-stone-200 hover:bg-orange-500 py-2.5 px-6 rounded-xl transition-all duration-200 font-medium text-sm tracking-wide"
             >
               Sign Up
             </a>

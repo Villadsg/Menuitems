@@ -50,7 +50,7 @@
     {
       icon: 'fas fa-share-alt',
       title: 'Share A Menu',
-      description: 'Share or update menu content for customers to discover and get discounts'
+      description: 'Share or update menu content for customers to discover and get future discounts'
     }
   ];
 
@@ -69,7 +69,7 @@
     {
       number: '3',
       title: 'Add Your Own Menu',
-      description: 'Restaurant owners can easily add their menu items for customers to find.'
+      description: 'Owners can easily add their menu items for customers to find.'
     }
   ];
 </script>
