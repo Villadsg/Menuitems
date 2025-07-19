@@ -129,8 +129,8 @@
     <div class="min-h-screen bg-gradient-to-br from-gray-50 to-white flex items-center justify-center">
       <div class="text-center max-w-lg mx-auto px-6">
         <div class="bg-white/90 backdrop-blur-sm rounded-3xl shadow-sm p-12 border border-gray-100/50">
-          <h1 class="text-4xl font-light mb-6 text-gray-900 tracking-tight leading-tight">Menu content near you</h1>
-          <p class="text-lg mb-12 text-gray-600 font-light leading-relaxed">Browse and compare menu content from places around you</p>
+          <h1 class="text-4xl font-light mb-6 text-gray-900 tracking-tight leading-tight">Menu content</h1>
+          <p class="text-lg mb-12 text-gray-600 font-light leading-relaxed">Browse and find highly rated menu content near you</p>
           <div class="flex flex-col space-y-3">
             <a href="/find-quiz">
               <button class="bg-stone-100 py-4 px-8 hover:bg-stone-200 rounded-xl w-full flex items-center justify-center transition-all duration-200 shadow-sm hover:shadow-md font-medium text-sm tracking-wide">
