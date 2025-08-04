@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
+import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public'
 
-const supabaseUrl = 'https://gyyzmecfszokyaawocld.supabase.co'
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd5eXptZWNmc3pva3lhYXdvY2xkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE2MjcwOTksImV4cCI6MjA2NzIwMzA5OX0.Nd82FCeKUSBd3pgJMUisd5jz4sfsL-15c1mFJeW_iEM'
+const supabaseUrl = PUBLIC_SUPABASE_URL
+const supabaseKey = PUBLIC_SUPABASE_ANON_KEY
 
 export const supabase = createClient(supabaseUrl, supabaseKey)
