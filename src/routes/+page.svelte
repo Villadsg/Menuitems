@@ -38,8 +38,23 @@
   // Features section data
   const features = [
     {
+      icon: 'fas fa-mobile-alt',
+      title: 'Digitalize Your Menu for Free',
+      description: 'Transform your physical menu into a digital format at no cost - simply upload photos and let our system do the rest'
+    },
+    {
+      icon: 'fas fa-lightbulb',
+      title: 'Get Menu Item Suggestions',
+      description: 'Receive AI-powered suggestions for new menu items based on your current offerings and location trends'
+    },
+    {
+      icon: 'fas fa-star',
+      title: 'Highlight Your Best Items',
+      description: 'Using the platform, your unique or best items get highlighted in search results, helping customers discover your signature dishes'
+    },
+    {
       icon: 'fas fa-utensils',
-      title: 'Local Menus as one Menu',
+      title: 'Local Menus as One Menu',
       description: 'Filter and find menu content from restaurants in your area and see it as just one big menu'
     },
     {
@@ -98,7 +113,7 @@
                   </div>
                 </div>
                 <h3 class="text-lg font-medium text-gray-900 text-center mb-2">Find Menu Items</h3>
-                <p class="text-sm text-gray-600 text-center font-light">Browse and discover menu items near you</p>
+                <p class="text-sm text-gray-600 text-center font-light">Digitalize your menu for free or browse and discover menu items near you</p>
               </div>
             </a>
             

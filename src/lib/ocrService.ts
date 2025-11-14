@@ -17,12 +17,112 @@ export interface MenuOCRResult {
 }
 
 export class OCRService {
-  // Default configuration for local Qwen 2.5 VL instance
+  // Configuration constants
+  private static readonly OCR_BASE_URL = 'http://localhost:8000';
+  private static readonly OCR_TIMEOUT = 60000;
+  private static readonly OCR_BASE_SIZE = 1024;
+  private static readonly OCR_IMAGE_SIZE = 640;
+  private static readonly OCR_PROMPT = `<image>\n<|grounding|>Extract this menu and convert to structured data. Include all menu items with their names, descriptions, and prices. Organize by categories if visible. Format the restaurant name clearly at the top.`;
+
+  // Validation constants
+  private static readonly MIN_TEXT_LENGTH = 20;
+  private static readonly MIN_LINES_FOR_MENU = 3;
+
+  // Default configuration for DeepSeek-OCR service
   private static defaultConfig = {
-    baseUrl: 'http://localhost:11434', // Default Ollama port
-    model: 'qwen2.5vl:7b',
-    timeout: 30000
+    baseUrl: this.OCR_BASE_URL,
+    timeout: this.OCR_TIMEOUT
   };
+
+  /**
+   * Process image directly from File object (for anonymous users)
+   * @param file The image file to process
+   * @returns Processed menu text data
+   */
+  static async processImageDirectly(file: File): Promise<MenuOCRResult> {
+    try {
+      const config = this.getConfig();
+
+      // Convert file to base64
+      const arrayBuffer = await file.arrayBuffer();
+      const uint8Array = new Uint8Array(arrayBuffer);
+      const base64String = btoa(String.fromCharCode(...uint8Array));
+
+      // Call DeepSeek-OCR service
+      const response = await fetch(`${config.baseUrl}/api/generate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          image: base64String,
+          prompt: this.OCR_PROMPT,
+          base_size: this.OCR_BASE_SIZE,
+          image_size: this.OCR_IMAGE_SIZE,
+          crop_mode: true,
+          test_compress: true
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('OCR service error:', response.status, response.statusText);
+        throw new Error(`OCR API error: ${response.statusText}. ${errorText}`);
+      }
+
+      const data = await response.json();
+
+      // Extract structured data
+      let rawText = '';
+      let menuItems = [];
+      let enhancedMenuStructure = null;
+
+      if (data.menuItems && Array.isArray(data.menuItems)) {
+        menuItems = data.menuItems.map((item: any) => ({
+          name: item.name || '',
+          description: item.description || '',
+          price: item.price || '',
+          category: item.category || 'Uncategorized'
+        }));
+        rawText = data.rawText || '';
+        enhancedMenuStructure = data.enhancedStructure || null;
+      } else {
+        rawText = data.rawText || JSON.stringify(data);
+        menuItems = [];
+      }
+
+      // Extract restaurant name
+      let restaurantName = "Unknown Restaurant";
+      if (data.restaurantName) {
+        restaurantName = data.restaurantName;
+      } else if (enhancedMenuStructure && enhancedMenuStructure.restaurantName) {
+        restaurantName = enhancedMenuStructure.restaurantName;
+      }
+
+      const ocrResult: MenuOCRResult = {
+        rawText,
+        menuItems,
+        restaurantName,
+        enhancedStructure: enhancedMenuStructure,
+        debug: {
+          model: 'deepseek-ai/DeepSeek-OCR',
+          textLength: rawText.length,
+          extractedItems: menuItems.length,
+          enhancedAnalysis: !!enhancedMenuStructure,
+          ...(data.debug || {})
+        }
+      };
+
+      // Apply corrections
+      const basicCorrectedResult = applyMenuCorrections(ocrResult);
+      const fullyCorrectedResult = applyLearnedMenuCorrections(basicCorrectedResult);
+
+      return fullyCorrectedResult;
+    } catch (error) {
+      console.error('Direct OCR processing error:', error instanceof Error ? error.message : 'Unknown error');
+      throw error;
+    }
+  }
 
   /**
    * Get OCR configuration from environment or use defaults
@@ -36,16 +136,15 @@ export class OCRService {
 
     // Server-side: Check for custom configuration from environment
     const customConfig = {
-      baseUrl: (typeof process !== 'undefined' && process.env?.QWEN_VL_BASE_URL) || this.defaultConfig.baseUrl,
-      model: (typeof process !== 'undefined' && process.env?.QWEN_VL_MODEL) || this.defaultConfig.model,
-      timeout: parseInt((typeof process !== 'undefined' && process.env?.QWEN_VL_TIMEOUT) || String(this.defaultConfig.timeout))
+      baseUrl: (typeof process !== 'undefined' && process.env?.DEEPSEEK_OCR_BASE_URL) || this.defaultConfig.baseUrl,
+      timeout: parseInt((typeof process !== 'undefined' && process.env?.DEEPSEEK_OCR_TIMEOUT) || String(this.defaultConfig.timeout))
     };
 
     return customConfig;
   }
   
   /**
-   * Process an image with OCR to extract menu text using Qwen 2.5 VL
+   * Process an image with OCR to extract menu text using DeepSeek-OCR
    * @param imageFileId The Supabase storage file ID
    * @param bucketId The Supabase storage bucket ID
    * @returns Processed menu text data
@@ -79,8 +178,6 @@ export class OCRService {
         fileUrl = urlData.publicUrl;
       }
       
-      console.log('File URL:', fileUrl);
-      
       // Add a timestamp to avoid caching issues (only if not already a signed URL)
       let finalUrl = fileUrl;
       if (!fileUrl.includes('token=')) {
@@ -88,150 +185,82 @@ export class OCRService {
         const separator = fileUrl.includes('?') ? '&' : '?';
         finalUrl = `${fileUrl}${separator}timestamp=${timestamp}`;
       }
-      console.log('Final URL:', finalUrl);
       
-      // Convert image URL to base64 for Ollama
-      console.log('Fetching and converting image to base64...');
+      // Convert image URL to base64 for DeepSeek-OCR
       let imageBase64 = '';
-      
+
       try {
         const imageResponse = await fetch(finalUrl);
-        
+
         if (!imageResponse.ok) {
-          console.error('Image fetch failed:', {
-            status: imageResponse.status,
-            statusText: imageResponse.statusText,
-            url: finalUrl
-          });
+          console.error('Image fetch failed:', imageResponse.status, imageResponse.statusText);
           throw new Error(`Failed to fetch image: ${imageResponse.status} ${imageResponse.statusText}`);
         }
-        
+
         const imageBlob = await imageResponse.blob();
-        console.log('Image blob size:', imageBlob.size, 'type:', imageBlob.type);
-        
+        console.log('Image processed, size:', imageBlob.size, 'bytes');
+
         const arrayBuffer = await imageBlob.arrayBuffer();
         const uint8Array = new Uint8Array(arrayBuffer);
-        
+
         // Convert to base64
         const base64String = btoa(String.fromCharCode(...uint8Array));
         imageBase64 = base64String;
-        
-        console.log('Image converted to base64, length:', imageBase64.length);
       } catch (imageError) {
-        console.error('Error fetching/converting image:', imageError);
+        console.error('Error processing image:', imageError.message);
         throw new Error(`Failed to process image: ${imageError.message}`);
       }
 
-      // Call Qwen 2.5 VL for OCR
-      console.log('Calling Qwen 2.5 VL for OCR analysis...');
+      // Call DeepSeek-OCR for menu extraction
       const response = await fetch(`${config.baseUrl}/api/generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: config.model,
-          prompt: `You are an expert at reading and analyzing menu images. Please extract all text from this menu image and structure it as a JSON object with the following format:
-
-{
-  "restaurantName": "Name of the restaurant (if visible)",
-  "menuSections": [
-    {
-      "sectionName": "Section name (e.g., Appetizers, Main Course, etc.)",
-      "items": [
-        {
-          "name": "Item name",
-          "description": "Item description (if available)",
-          "price": "Price (if available, include currency symbol)"
-        }
-      ]
-    }
-  ],
-  "isMenu": true,
-  "rawText": "All text found in the image"
-}
-
-Focus on:
-1. Accurately extracting all text, especially prices and item names
-2. Properly grouping items by categories/sections
-3. Handling different orientations and languages
-4. Identifying the restaurant name if visible
-5. Being precise with price formatting
-
-If this is not a menu image, set "isMenu": false and include the raw text.`,
-          images: [imageBase64],
-          stream: false
+          image: imageBase64,
+          prompt: this.OCR_PROMPT,
+          base_size: this.OCR_BASE_SIZE,
+          image_size: this.OCR_IMAGE_SIZE,
+          crop_mode: true,
+          test_compress: true
         }),
       });
-      
-      console.log('Response status:', response.status);
-      
+
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Qwen VL API error:', errorText);
-        throw new Error(`Qwen VL API error: ${response.statusText}. ${errorText}`);
+        console.error('OCR service error:', response.status, response.statusText);
+        throw new Error(`DeepSeek-OCR API error: ${response.statusText}. ${errorText}`);
       }
-      
+
       const data = await response.json();
-      console.log('Qwen VL API response:', data);
+      console.log('OCR extraction completed, items found:', data.menuItems?.length || 0);
       
-      // Extract the generated response
-      let rawResponse = '';
-      if (data.response) {
-        rawResponse = data.response;
-      } else if (data.message && data.message.content) {
-        rawResponse = data.message.content;
-      } else {
-        console.warn('Unexpected response format from Qwen VL');
-        rawResponse = JSON.stringify(data);
-      }
-      
-      // Parse the JSON response from Qwen VL
-      let enhancedMenuStructure = null;
+      // Extract the response from DeepSeek-OCR
+      // The response should already be structured based on our FastAPI service
       let rawText = '';
       let menuItems = [];
-      
-      try {
-        // Try to extract JSON from the response
-        const jsonMatch = rawResponse.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          enhancedMenuStructure = JSON.parse(jsonMatch[0]);
-          rawText = enhancedMenuStructure.rawText || rawResponse;
-          
-          // Check if the content was identified as a menu
-          if (enhancedMenuStructure.isMenu === false) {
-            console.warn('Content was not identified as a menu. Using raw text instead.');
-            
-            // Create simple text items from the raw text
-            const lines = rawText.split('\n').filter(line => line.trim());
-            for (const line of lines) {
-              if (line.trim()) {
-                menuItems.push({
-                  name: line.trim(),
-                  category: 'Text Content'
-                });
-              }
-            }
-          } else {
-            // Convert the enhanced structure to menu items
-            menuItems = this.convertEnhancedStructureToMenuItems(enhancedMenuStructure);
-            console.log('Menu items extracted from enhanced structure:', menuItems.length);
-          }
-        } else {
-          // If no JSON found, treat as plain text
-          rawText = rawResponse;
-          menuItems = this.processMenuText(rawText);
-          console.log('Menu items extracted from basic processing:', menuItems.length);
-        }
-      } catch (parseError) {
-        console.error('Error parsing Qwen VL response, falling back to basic processing:', parseError);
-        rawText = rawResponse;
+      let enhancedMenuStructure = null;
+
+      if (data.menuItems && Array.isArray(data.menuItems)) {
+        // DeepSeek-OCR service already returns structured data
+        menuItems = data.menuItems.map((item: any) => ({
+          name: item.name || '',
+          description: item.description || '',
+          price: item.price || '',
+          category: item.category || 'Uncategorized'
+        }));
+        rawText = data.rawText || '';
+        enhancedMenuStructure = data.enhancedStructure || null;
+      } else {
+        console.warn('Unexpected response format, attempting fallback processing');
+        // Fallback to basic text processing if the response format is unexpected
+        rawText = data.rawText || JSON.stringify(data);
         menuItems = this.processMenuText(rawText);
-        console.log('Menu items extracted from fallback processing:', menuItems.length);
       }
       
       // Check if there's enough text to process
-      if (!rawText || rawText.trim().length < 20) {
+      if (!rawText || rawText.trim().length < this.MIN_TEXT_LENGTH) {
         console.warn('Insufficient text detected in the image. Cannot extract menu items.');
         throw new Error('No menu text detected in the image. Please try with a clearer menu photo.');
       }
@@ -243,22 +272,22 @@ If this is not a menu image, set "isMenu": false and include the raw text.`,
       
       // Extract restaurant name
       let restaurantName = "Unknown Restaurant";
-      
-      // First try to get the name from the enhanced structure
-      if (enhancedMenuStructure && enhancedMenuStructure.restaurantName) {
+
+      // First try to get the name from the DeepSeek-OCR response
+      if (data.restaurantName) {
+        restaurantName = data.restaurantName;
+      } else if (enhancedMenuStructure && enhancedMenuStructure.restaurantName) {
         restaurantName = enhancedMenuStructure.restaurantName;
-        console.log('Restaurant name from enhanced structure:', restaurantName);
       }
-      
+
       // If we couldn't get a name or got the default, try to extract it from the raw text
       if (restaurantName === "Unknown Restaurant" || restaurantName.includes("OR")) {
         const extractedName = this.extractRestaurantNameFromRawText(rawText);
         if (extractedName) {
           restaurantName = extractedName;
-          console.log('Restaurant name extracted from raw text:', restaurantName);
         }
       }
-      
+
       // Create the OCR result
       const ocrResult: MenuOCRResult = {
         rawText,
@@ -266,28 +295,26 @@ If this is not a menu image, set "isMenu": false and include the raw text.`,
         restaurantName,
         enhancedStructure: enhancedMenuStructure,
         debug: {
-          model: config.model,
+          model: 'deepseek-ai/DeepSeek-OCR',
           textLength: rawText.length,
           extractedItems: menuItems.length,
-          processingTimeMs: data.eval_duration || 0,
-          enhancedAnalysis: !!enhancedMenuStructure
+          processingTimeMs: 0,
+          enhancedAnalysis: !!enhancedMenuStructure,
+          ...(data.debug || {})
         }
       };
-      
-      console.log('Processed OCR result:', ocrResult);
-      
+
       // Apply basic menu corrections (price formatting, etc.)
       const basicCorrectedResult = applyMenuCorrections(ocrResult);
-      console.log('Applied basic menu corrections to OCR result');
-      
+
       // Apply learned corrections from feedback data
       const fullyCorrectedResult = applyLearnedMenuCorrections(basicCorrectedResult);
-      console.log('Applied learned corrections from feedback data');
-      
+      console.log('Menu corrections applied');
+
       return fullyCorrectedResult;
     } catch (error: unknown) {
-      console.error('OCR processing error:', error);
-      
+      console.error('OCR processing error:', error instanceof Error ? error.message : 'Unknown error');
+
       // Create a more user-friendly error message
       let userMessage = 'Failed to process menu image';
       
@@ -296,7 +323,7 @@ If this is not a menu image, set "isMenu": false and include the raw text.`,
         if (error.message.includes('timeout') || error.message.includes('timed out')) {
           userMessage = 'The OCR processing timed out. Please try again with a clearer image or try later.';
         } else if (error.message.includes('ECONNREFUSED') || error.message.includes('Connection refused')) {
-          userMessage = 'Cannot connect to Qwen VL service. Please ensure Qwen 2.5 VL is running locally on port 11434.';
+          userMessage = 'Cannot connect to DeepSeek-OCR service. Please ensure the DeepSeek-OCR service is running locally on port 8000.';
         } else if (error.message.includes('rate limit')) {
           userMessage = 'OCR service rate limit exceeded. Please try again in a few minutes.';
         } else if (error.message.includes('Failed to parse error response')) {
@@ -326,17 +353,17 @@ If this is not a menu image, set "isMenu": false and include the raw text.`,
    * @returns Structured menu items
    */
   private static processMenuText(text: string): MenuOCRResult['menuItems'] {
-    // If text is empty or too short (less than 20 chars), return empty array
-    if (!text || text.trim().length < 20) {
-      console.log('Insufficient text for menu item extraction, returning empty array');
+    // If text is empty or too short, return empty array
+    if (!text || text.trim().length < this.MIN_TEXT_LENGTH) {
+      console.log('Insufficient text for menu item extraction');
       return [];
     }
-    
+
     const lines = text.split('\n').filter(line => line.trim());
-    
+
     // If there are too few lines, it's probably not a menu
-    if (lines.length < 3) {
-      console.log('Too few lines for menu item extraction, returning empty array');
+    if (lines.length < this.MIN_LINES_FOR_MENU) {
+      console.log('Too few lines for menu item extraction');
       return [];
     }
     
@@ -421,9 +448,7 @@ If this is not a menu image, set "isMenu": false and include the raw text.`,
       if (ocrResult.enhancedStructure) {
         updateData.ocr_enhanced_structure = JSON.stringify(ocrResult.enhancedStructure);
       }
-      
-      console.log('Saving structured menu data to Supabase:', structuredMenuItems);
-      
+
       await SupabaseService.updateDocument(tableName, menuId, updateData);
       
       // Then save each menu item to a separate table for individual access
@@ -445,45 +470,7 @@ If this is not a menu image, set "isMenu": false and include the raw text.`,
     }
   }
   
-  
-  /**
-   * Convert the enhanced menu structure to the MenuOCRResult format
-   * @param enhancedStructure The enhanced menu structure from Qwen VL analysis
-   * @returns Menu items in the format expected by the application
-   */
-  private static convertEnhancedStructureToMenuItems(enhancedStructure: any): MenuOCRResult['menuItems'] {
-    const menuItems: MenuOCRResult['menuItems'] = [];
-    
-    // Check if the structure is marked as not being a menu
-    if (enhancedStructure && enhancedStructure.isMenu === false) {
-      console.log('Text was not identified as a menu. Returning empty menu items.');
-      return [];
-    }
-    
-    if (enhancedStructure && enhancedStructure.menuSections) {
-      for (const section of enhancedStructure.menuSections) {
-        // Process each item in the section
-        if (section.items && Array.isArray(section.items)) {
-          for (const item of section.items) {
-            menuItems.push({
-              name: item.name || '',
-              price: item.price || '',
-              description: item.description || '',
-              category: section.sectionName || 'Uncategorized'
-            });
-          }
-        }
-      }
-    }
-    
-    return menuItems;
-  }
-  
-  /**
-   * Create a structured format for menu items that makes them easily separable
-   * @param menuItems The menu items to structure
-   * @returns A structured format with sections and items
-   */
+
   /**
    * Attempt to extract a restaurant name from raw OCR text using heuristics
    * @param rawText The raw OCR text from the menu

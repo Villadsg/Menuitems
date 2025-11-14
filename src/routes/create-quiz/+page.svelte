@@ -9,9 +9,16 @@
   import { toasts } from '$lib/stores/toastStore';
   import Loading from '$lib/components/Loading.svelte';
 
-  import { OCRService } from '$lib/ocrService'; // Import OCR service
-  // No longer need CryptoJS as we'll use Appwrite's built-in signature
- 
+  import { OCRService } from '$lib/ocrService';
+
+  // Configuration constants
+  const COMPRESSION_QUALITY = 0.7;
+  const MIN_MENU_ITEMS = 3;
+  const MIN_PRICE_RATIO = 0.2;
+  const MIN_ITEMS_WITH_PRICES = 2;
+  const QUALITY_THRESHOLD = 3;
+  const REDIRECT_DELAY_MS = 2000;
+
   let routeName = '';
   let lat = '';
   let gpsMessage = '';
@@ -58,200 +65,11 @@
   
   let currentPage = 'beginSection';
   $: userId = $user?.id || 'anonymous';
-  
-  /** Process image directly with OCR without uploading to storage (for anonymous users) */
-  const processImageDirectly = async (file: File): Promise<OCRResult> => {
-    try {
-      // Convert file to base64
-      const arrayBuffer = await file.arrayBuffer();
-      const uint8Array = new Uint8Array(arrayBuffer);
-      const base64String = btoa(String.fromCharCode(...uint8Array));
-      
-      // Call Qwen 2.5 VL directly
-      const response = await fetch('http://localhost:11434/api/generate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'qwen2.5vl:7b',
-          prompt: `You are an expert at reading and analyzing menu images. Please extract all text from this menu image and structure it as a JSON object with the following format:
 
-{
-  "restaurantName": "Name of the restaurant (if visible)",
-  "menuSections": [
-    {
-      "sectionName": "Section name (e.g., Appetizers, Main Course, etc.)",
-      "items": [
-        {
-          "name": "Item name",
-          "description": "Item description (if available)",
-          "price": "Price (if available, include currency symbol)"
-        }
-      ]
-    }
-  ],
-  "isMenu": true,
-  "rawText": "All text found in the image"
-}
-
-Focus on:
-1. Accurately extracting all text, especially prices and item names
-2. Properly grouping items by categories/sections
-3. Handling different orientations and languages
-4. Identifying the restaurant name if visible
-5. Being precise with price formatting
-
-If this is not a menu image, set "isMenu": false and include the raw text.`,
-          images: [base64String],
-          stream: false
-        }),
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`OCR API error: ${response.statusText}. ${errorText}`);
-      }
-      
-      const data = await response.json();
-      
-      // Extract the generated response
-      let rawResponse = data.response || data.message?.content || JSON.stringify(data);
-      
-      // Parse the JSON response
-      let enhancedMenuStructure = null;
-      let rawText = '';
-      let menuItems = [];
-      
-      try {
-        const jsonMatch = rawResponse.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          enhancedMenuStructure = JSON.parse(jsonMatch[0]);
-          rawText = enhancedMenuStructure.rawText || rawResponse;
-          
-          if (enhancedMenuStructure.isMenu === false) {
-            // Create simple text items from raw text
-            const lines = rawText.split('\n').filter(line => line.trim());
-            for (const line of lines) {
-              if (line.trim()) {
-                menuItems.push({
-                  name: line.trim(),
-                  category: 'Text Content'
-                });
-              }
-            }
-          } else {
-            // Convert enhanced structure to menu items
-            menuItems = convertEnhancedStructureToMenuItems(enhancedMenuStructure);
-          }
-        } else {
-          // Fallback to basic text processing
-          rawText = rawResponse;
-          menuItems = processBasicMenuText(rawText);
-        }
-      } catch (parseError) {
-        console.error('Error parsing OCR response:', parseError);
-        rawText = rawResponse;
-        menuItems = processBasicMenuText(rawText);
-      }
-      
-      // Extract restaurant name
-      let restaurantName = "Unknown Restaurant";
-      if (enhancedMenuStructure && enhancedMenuStructure.restaurantName) {
-        restaurantName = enhancedMenuStructure.restaurantName;
-      }
-      
-      return {
-        rawText,
-        menuItems,
-        restaurantName,
-        enhancedStructure: enhancedMenuStructure,
-        debug: {
-          model: 'qwen2.5vl:7b',
-          textLength: rawText.length,
-          extractedItems: menuItems.length,
-          enhancedAnalysis: !!enhancedMenuStructure
-        }
-      };
-    } catch (error) {
-      console.error('Direct OCR processing error:', error);
-      throw error;
-    }
-  };
-  
-  /** Convert enhanced structure to menu items */
-  const convertEnhancedStructureToMenuItems = (enhancedStructure: any): MenuItem[] => {
-    const menuItems: MenuItem[] = [];
-    
-    if (enhancedStructure && enhancedStructure.menuSections) {
-      for (const section of enhancedStructure.menuSections) {
-        if (section.items && Array.isArray(section.items)) {
-          for (const item of section.items) {
-            menuItems.push({
-              name: item.name || '',
-              price: item.price || '',
-              description: item.description || '',
-              category: section.sectionName || 'Uncategorized'
-            });
-          }
-        }
-      }
-    }
-    
-    return menuItems;
-  };
-  
-  /** Process basic menu text */
-  const processBasicMenuText = (text: string): MenuItem[] => {
-    if (!text || text.trim().length < 20) {
-      return [];
-    }
-    
-    const lines = text.split('\n').filter(line => line.trim());
-    if (lines.length < 3) {
-      return [];
-    }
-    
-    const menuItems: MenuItem[] = [];
-    let currentCategory = 'Uncategorized';
-    
-    for (const line of lines) {
-      const priceMatch = line.match(/\$\d+\.\d{2}|\d+\.\d{2}€|\d+\.\d{2}/);
-      
-      if (line.match(/^[A-Z\s]+$/) || line.endsWith(':')) {
-        currentCategory = line.trim().replace(/:$/, '');
-        menuItems.push({
-          name: currentCategory,
-          category: currentCategory
-        });
-      } else if (priceMatch) {
-        const price = priceMatch[0];
-        const priceIndex = priceMatch.index || 0;
-        const name = line.substring(0, priceIndex).trim();
-        const description = line.substring(priceIndex + price.length).trim();
-        
-        menuItems.push({
-          name,
-          price,
-          description,
-          category: currentCategory
-        });
-      } else if (line.trim()) {
-        menuItems.push({
-          name: line.trim(),
-          category: currentCategory
-        });
-      }
-    }
-    
-    return menuItems;
-  };
-  
   /** Function to extract coordinates from EXIF metadata */
   const extractPhotoCoordinates = async (file: File) => {
     try {
       const metadata = await exifr.parse(file, { gps: true });
-      console.log('Full EXIF metadata:', metadata);
       if (metadata && metadata.GPSLatitude && metadata.GPSLongitude) {
         // Ensure we have valid numeric values
         const validLat = !isNaN(parseFloat(metadata.GPSLatitude.toString()));
@@ -279,7 +97,10 @@ If this is not a menu image, set "isMenu": false and include the raw text.`,
     }
   };
 
-  /** Handle photo upload and compression */
+  /**
+   * Handle photo upload and compression
+   * Processes the uploaded photo, extracts GPS coordinates if available, compresses the image, and initiates OCR
+   */
   const handlePhotoUpload = async () => {
     if (filesMainPhoto && filesMainPhoto[0]) {
       try {
@@ -290,9 +111,8 @@ If this is not a menu image, set "isMenu": false and include the raw text.`,
         await extractPhotoCoordinates(filesMainPhoto[0]);
         
         // Compress the image
-        compressedFile = await compressImage(filesMainPhoto[0], 0.7);
-        console.log('Compressed file size:', compressedFile.size);
-        
+        compressedFile = await compressImage(filesMainPhoto[0], COMPRESSION_QUALITY);
+
         // Process the image with OCR
         await processImageWithOCR();
       } catch (error) {
@@ -302,7 +122,12 @@ If this is not a menu image, set "isMenu": false and include the raw text.`,
     }
   };
 
-  /** Process the uploaded image with OCR */
+  /**
+   * Process the uploaded image with OCR
+   * For anonymous users: processes directly via base64
+   * For authenticated users: uploads to storage first, then processes
+   * Applies menu corrections and initializes editable menu items
+   */
   const processImageWithOCR = async () => {
     if (!compressedFile && !filesMainPhoto?.[0]) {
       return;
@@ -319,7 +144,7 @@ If this is not a menu image, set "isMenu": false and include the raw text.`,
       if (!$user) {
         // Process the image with OCR directly using base64
         const fileToProcess = compressedFile || filesMainPhoto?.[0];
-        ocrResult = await processImageDirectly(fileToProcess);
+        ocrResult = await OCRService.processImageDirectly(fileToProcess);
       } else {
         // For authenticated users, upload the file and process via storage
         const fileToUpload = compressedFile || filesMainPhoto?.[0];
@@ -363,32 +188,22 @@ If this is not a menu image, set "isMenu": false and include the raw text.`,
           }
         }
       }
-      
-      // Log OCR data for debugging
+
+      // Show extraction success
       if (ocrResult && ocrResult.rawText) {
-        
-        // Show which model was used and quality metrics
         if (ocrResult.debug) {
           const debug = ocrResult.debug;
-          
+
           if (debug.model) {
             // Get quality indicator based on extracted items
-            const qualityIndicator = debug.extractedItems > 15 ? 'excellent' : 
-                                    debug.extractedItems > 10 ? 'good' : 
+            const qualityIndicator = debug.extractedItems > 15 ? 'excellent' :
+                                    debug.extractedItems > 10 ? 'good' :
                                     debug.extractedItems > 5 ? 'fair' : 'basic';
-            
+
             toasts.success(
               `Menu text extracted successfully! ` +
               `(${qualityIndicator} quality, ${debug.extractedItems} items found)`
             );
-            
-            // Log additional details for debugging
-            console.log(`OCR Quality Metrics:`, {
-              model: debug.model,
-              processingTimeMs: debug.processingTimeMs || 'N/A',
-              textLength: debug.textLength,
-              extractedItems: debug.extractedItems
-            });
           } else {
             toasts.success('Menu text extracted successfully!');
           }
@@ -422,11 +237,8 @@ If this is not a menu image, set "isMenu": false and include the raw text.`,
   };
 
   /**
-   * Find duplicate images in the Appwrite bucket based on file signature (MD5 hash)
-   * @param file The file to check for duplicates
-   * @returns The fileId of the duplicate if found, null otherwise
+   * Add a new empty menu item to the editable items list
    */
-  // Function to add a new menu item
   const addMenuItem = () => {
     editableMenuItems = [
       ...editableMenuItems,
@@ -439,12 +251,19 @@ If this is not a menu image, set "isMenu": false and include the raw text.`,
     ];
   };
   
-  // Function to remove a menu item
+  /**
+   * Remove a menu item from the editable items list
+   * @param index The index of the item to remove
+   */
   const removeMenuItem = (index: number) => {
     editableMenuItems = editableMenuItems.filter((_, i) => i !== index);
   };
   
-  // Function to save edited menu items and store feedback for learning
+  /**
+   * Save edited menu items and store feedback for learning
+   * Updates the OCR result with user corrections and saves feedback to database for ML improvement
+   * Only authenticated users have their feedback stored
+   */
   const saveEditedMenuItems = async () => {
     if (ocrResult) {
       // Store the original menu items before updating
@@ -481,7 +300,6 @@ If this is not a menu image, set "isMenu": false and include the raw text.`,
             timestamp: new Date().toISOString(),
             menu_structure: ocrResult.enhancedStructure ? JSON.stringify(ocrResult.enhancedStructure) : null
           });
-          console.log('Menu OCR feedback saved for learning');
           toasts.success("Menu items updated successfully. Your edits will help improve future menu recognition");
         } catch (error) {
           console.error('Failed to save menu OCR feedback:', error);
@@ -497,19 +315,10 @@ If this is not a menu image, set "isMenu": false and include the raw text.`,
     }
   };
 
-  // Simplified duplicate checking for Supabase (can be enhanced later)
-  const findDuplicateImage = async (file: File): Promise<string | null> => {
-    // For now, we'll skip duplicate detection and let Supabase handle storage
-    return null;
-  };
-  
-  // Simplified cleanup for Supabase (can be enhanced later)
-  const cleanupDuplicateMenuPhotos = async (currentFileId: string, fileSize: number): Promise<void> => {
-    // For now, we'll skip cleanup and let Supabase handle storage management
-    return;
-  };
-
-  /** Function to upload the main photo */
+  /**
+   * Upload the main photo to Supabase storage
+   * @returns The file path/ID in storage, or null if upload fails
+   */
   const uploadMainPhoto = async () => {
     if (!compressedFile && !filesMainPhoto?.[0]) {
       toasts.error('Please select a photo to upload');
@@ -522,24 +331,10 @@ If this is not a menu image, set "isMenu": false and include the raw text.`,
       toasts.error('No file available for upload');
       return null;
     }
-    
+
     try {
-      // Check if a duplicate exists based on file properties
-      const duplicateFileId = await findDuplicateImage(fileToUpload);
-      
-      if (duplicateFileId) {
-        console.log('Using existing file instead of uploading duplicate:', duplicateFileId);
-        toasts.info('A similar menu photo already exists. Using the existing photo to save storage space.');
-        return duplicateFileId;
-      }
-      
       // Upload the file to Supabase Storage
       const response = await SupabaseService.uploadFile(fileToUpload, bucketId);
-      
-      // After successful upload, clean up any other duplicate menu photos
-      await cleanupDuplicateMenuPhotos(response.path, fileToUpload.size);
-      
-      console.log('File uploaded successfully:', response);
       return response.path;
     } catch (error) {
       console.error('Error uploading file:', error);
@@ -550,7 +345,8 @@ If this is not a menu image, set "isMenu": false and include the raw text.`,
 
   /**
    * Validate that the OCR results contain actual menu items
-   * @returns {boolean} True if the data likely represents a menu, false otherwise
+   * Checks minimum item count, price information, and quality indicators
+   * @returns True if the data likely represents a menu, false otherwise
    */
   const validateMenuItems = () => {
     // If no OCR result, we can't validate
@@ -558,21 +354,20 @@ If this is not a menu image, set "isMenu": false and include the raw text.`,
       toasts.error('No menu items detected. Please try with a clearer menu image.');
       return false;
     }
-    
-    // Minimum number of menu items required (adjust as needed)
-    const MIN_MENU_ITEMS = 3;
+
+    // Minimum number of menu items required
     if (ocrResult.menuItems.length < MIN_MENU_ITEMS) {
-      toasts.error(`What the f are you trying to upload? `);
+      toasts.error(`Too few menu items detected. Please upload a clearer photo with at least ${MIN_MENU_ITEMS} menu items.`);
       return false;
     }
-    
+
     // Check if we have at least some items with prices (common in menus)
     const itemsWithPrices = ocrResult.menuItems.filter(item => item.price && item.price.trim() !== '');
     const priceRatio = itemsWithPrices.length / ocrResult.menuItems.length;
-    
-    // At least 20% of items should have prices to be considered a menu
-    if (priceRatio < 0.2 && itemsWithPrices.length < 2) {
-      toasts.error('Few price information detected. This may not be a menu image.');
+
+    // Validate price information
+    if (priceRatio < MIN_PRICE_RATIO && itemsWithPrices.length < MIN_ITEMS_WITH_PRICES) {
+      toasts.error('Limited price information detected. This may not be a menu image. Please upload a clearer photo.');
       return false;
     }
     
@@ -599,19 +394,21 @@ If this is not a menu image, set "isMenu": false and include the raw text.`,
     if (hasCategories) qualityScore += 2;
     if (hasDescriptions) qualityScore += 1;
     if (priceRatio > 0.5) qualityScore += 2;
-    
+
     // If we have a good quality score, it's likely a menu
-    const QUALITY_THRESHOLD = 3;
     if (qualityScore >= QUALITY_THRESHOLD) {
       return true;
     }
     
     // Otherwise, show a warning but allow override
-    const confirmed = confirm('This doesn\'t appear to be a typical menu. Are you sure you want to proceed with uploading?');
+    const confirmed = confirm('This image doesn\'t appear to be a typical menu based on our analysis. Would you like to proceed with uploading anyway?');
     return confirmed;
   };
   
-  /** Submit the quiz */
+  /**
+   * Submit the menu data to the database
+   * Validates menu items, uploads photo (for authenticated users), and creates database entry
+   */
   const submitQuiz = async () => {
     try {
       // First validate if the extracted content is likely a menu
@@ -670,15 +467,14 @@ If this is not a menu image, set "isMenu": false and include the raw text.`,
       }
       
       const response = await SupabaseService.createDocument(tableName, documentData);
-      
-      console.log('Document created successfully:', response);
+
       toasts.success('Menu uploaded successfully!');
       
       // Show confirmation page and redirect after a delay
       currentPage = 'confirmationPage';
       setTimeout(() => {
         goto('/');
-      }, 2000);
+      }, REDIRECT_DELAY_MS);
     } catch (error) {
       console.error('Error creating document:', error);
       toasts.error('Error saving menu: ' + error.message);
@@ -687,7 +483,9 @@ If this is not a menu image, set "isMenu": false and include the raw text.`,
     }
   };
 
-  /** Fetch current location */
+  /**
+   * Fetch the user's current location using the browser's geolocation API
+   */
   const fetchCurrentLocation = async () => {
     try {
       loading = true;

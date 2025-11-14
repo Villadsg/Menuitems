@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  deepseek-ocr:
+    build: .
+    container_name: deepseek-ocr-service
+    ports:
+      - "8000:8000"
+    environment:
+      - CUDA_DEVICE=0
+      - PORT=8000
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    volumes:
+      - ./models:/root/.cache/huggingface  # Cache downloaded models
+    restart: unless-stopped
