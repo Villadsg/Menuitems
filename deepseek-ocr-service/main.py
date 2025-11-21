@@ -11,6 +11,10 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any
 import tempfile
 import logging
+import hashlib
+from functools import lru_cache
+from PIL import Image
+import io
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -30,6 +34,9 @@ app.add_middleware(
 # Global model and tokenizer
 model = None
 tokenizer = None
+
+# Cache for OCR results (stores last 50 results)
+ocr_cache = {}
 
 class OCRRequest(BaseModel):
     image: str  # Base64 encoded image
@@ -79,6 +86,73 @@ def load_model():
     except Exception as e:
         logger.error(f"Error loading model: {e}")
         raise
+
+def create_dummy_image():
+    """Create a small dummy image for model warm-up"""
+    # Create a simple 640x480 white image with some text
+    img = Image.new('RGB', (640, 480), color='white')
+
+    # Save to temp file
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as tmp_file:
+        img.save(tmp_file, format='JPEG')
+        return tmp_file.name
+
+def warm_up_model():
+    """Warm up the model with a dummy inference to eliminate cold start"""
+    if model is None or tokenizer is None:
+        logger.warning("Cannot warm up: model not loaded")
+        return
+
+    logger.info("Warming up model with dummy inference...")
+
+    try:
+        # Create dummy image
+        dummy_image_path = create_dummy_image()
+
+        # Run a quick inference
+        output_dir = tempfile.mkdtemp()
+        prompt = "<image>\nExtract text from this image."
+
+        _ = model.infer(
+            tokenizer,
+            prompt=prompt,
+            image_file=dummy_image_path,
+            output_path=output_dir,
+            base_size=1024,
+            image_size=640,
+            crop_mode=True,
+            save_results=False,
+            test_compress=True
+        )
+
+        # Clean up
+        if os.path.exists(dummy_image_path):
+            os.unlink(dummy_image_path)
+
+        logger.info("Model warm-up completed successfully ✓")
+
+    except Exception as e:
+        logger.warning(f"Model warm-up failed (non-critical): {e}")
+
+def compute_image_hash(image_data: bytes) -> str:
+    """Compute SHA256 hash of image data for caching"""
+    return hashlib.sha256(image_data).hexdigest()
+
+def get_cached_result(image_hash: str) -> Optional[Dict[str, Any]]:
+    """Get cached OCR result if available"""
+    return ocr_cache.get(image_hash)
+
+def cache_result(image_hash: str, result: Dict[str, Any]):
+    """Cache OCR result with LRU eviction (max 50 entries)"""
+    global ocr_cache
+
+    # Simple LRU: if cache is full, remove oldest entry
+    if len(ocr_cache) >= 50:
+        # Remove first (oldest) entry
+        oldest_key = next(iter(ocr_cache))
+        del ocr_cache[oldest_key]
+
+    ocr_cache[image_hash] = result
 
 def parse_markdown_menu(markdown_text: str) -> Dict[str, Any]:
     """
@@ -176,8 +250,9 @@ def parse_markdown_menu(markdown_text: str) -> Dict[str, Any]:
 
 @app.on_event("startup")
 async def startup_event():
-    """Load model on startup"""
+    """Load model on startup and warm it up"""
     load_model()
+    warm_up_model()
 
 @app.get("/")
 async def root():
@@ -195,7 +270,33 @@ async def health():
         "status": "healthy",
         "model_loaded": model is not None,
         "cuda_available": torch.cuda.is_available(),
-        "cuda_device_count": torch.cuda.device_count() if torch.cuda.is_available() else 0
+        "cuda_device_count": torch.cuda.device_count() if torch.cuda.is_available() else 0,
+        "cache_size": len(ocr_cache)
+    }
+
+@app.get("/health/warm")
+async def health_warm():
+    """
+    Keep-alive endpoint that touches the model to keep it warm.
+    Call this periodically to prevent cold starts.
+    """
+    if model is None or tokenizer is None:
+        return {"status": "model_not_loaded", "warm": False}
+
+    # Just return status - model is already warm from startup
+    return {
+        "status": "warm",
+        "model_loaded": True,
+        "cache_entries": len(ocr_cache)
+    }
+
+@app.get("/cache/stats")
+async def cache_stats():
+    """Get cache statistics"""
+    return {
+        "cache_size": len(ocr_cache),
+        "max_cache_size": 50,
+        "cache_utilization": f"{(len(ocr_cache) / 50) * 100:.1f}%"
     }
 
 @app.post("/api/generate", response_model=OCRResponse)
@@ -210,6 +311,14 @@ async def generate_ocr(request: OCRRequest):
     try:
         # Decode base64 image
         image_data = base64.b64decode(request.image)
+
+        # Check cache first
+        image_hash = compute_image_hash(image_data)
+        cached_result = get_cached_result(image_hash)
+
+        if cached_result:
+            logger.info(f"Cache hit for image {image_hash[:8]}...")
+            return OCRResponse(**cached_result)
 
         # Save to temporary file
         with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as tmp_file:
@@ -248,17 +357,25 @@ async def generate_ocr(request: OCRRequest):
             # Parse markdown into structured menu data
             parsed_data = parse_markdown_menu(markdown_text)
 
-            return OCRResponse(
-                menuItems=[MenuItem(**item) for item in parsed_data["menuItems"]],
-                restaurantName=parsed_data.get("restaurantName"),
-                rawText=parsed_data["rawText"],
-                enhancedStructure=None,
-                debug={
+            # Create response
+            response_data = {
+                "menuItems": [MenuItem(**item) for item in parsed_data["menuItems"]],
+                "restaurantName": parsed_data.get("restaurantName"),
+                "rawText": parsed_data["rawText"],
+                "enhancedStructure": None,
+                "debug": {
                     "model": "deepseek-ai/DeepSeek-OCR",
                     "prompt_used": prompt,
-                    "items_found": len(parsed_data["menuItems"])
+                    "items_found": len(parsed_data["menuItems"]),
+                    "cached": False
                 }
-            )
+            }
+
+            # Cache the result
+            cache_result(image_hash, response_data)
+            logger.info(f"Cached result for image {image_hash[:8]}...")
+
+            return OCRResponse(**response_data)
 
         finally:
             # Clean up temporary file
@@ -269,24 +386,86 @@ async def generate_ocr(request: OCRRequest):
         logger.error(f"Error during OCR: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/ocr/upload")
+@app.post("/api/ocr/upload", response_model=OCRResponse)
 async def upload_ocr(file: UploadFile = File(...)):
     """
-    Alternative endpoint that accepts file uploads directly.
+    Optimized endpoint that accepts binary file uploads directly.
+    Avoids base64 encoding/decoding overhead for better performance.
     """
     if model is None or tokenizer is None:
         raise HTTPException(status_code=503, detail="Model not loaded")
 
     try:
-        # Read file content
-        content = await file.read()
+        # Read file content as bytes
+        image_data = await file.read()
 
-        # Encode to base64
-        base64_image = base64.b64encode(content).decode('utf-8')
+        # Check cache first
+        image_hash = compute_image_hash(image_data)
+        cached_result = get_cached_result(image_hash)
 
-        # Use the generate endpoint
-        request = OCRRequest(image=base64_image)
-        return await generate_ocr(request)
+        if cached_result:
+            logger.info(f"Cache hit for uploaded file {image_hash[:8]}...")
+            # Add cached flag to debug info
+            cached_result["debug"]["cached"] = True
+            return OCRResponse(**cached_result)
+
+        # Save to temporary file
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as tmp_file:
+            tmp_file.write(image_data)
+            tmp_file_path = tmp_file.name
+
+        try:
+            # Default prompt for menu extraction
+            prompt = "<image>\n<|grounding|>Extract this menu and convert to structured data. Include all menu items with their names, descriptions, and prices. Organize by categories if visible. Format the restaurant name clearly at the top."
+
+            # Create output directory
+            output_dir = tempfile.mkdtemp()
+
+            # Run inference
+            logger.info("Running inference on uploaded image...")
+            result = model.infer(
+                tokenizer,
+                prompt=prompt,
+                image_file=tmp_file_path,
+                output_path=output_dir,
+                base_size=1024,
+                image_size=640,
+                crop_mode=True,
+                save_results=True,
+                test_compress=True
+            )
+
+            # Parse the result
+            markdown_text = result if isinstance(result, str) else str(result)
+
+            # Parse markdown into structured menu data
+            parsed_data = parse_markdown_menu(markdown_text)
+
+            # Create response
+            response_data = {
+                "menuItems": [MenuItem(**item) for item in parsed_data["menuItems"]],
+                "restaurantName": parsed_data.get("restaurantName"),
+                "rawText": parsed_data["rawText"],
+                "enhancedStructure": None,
+                "debug": {
+                    "model": "deepseek-ai/DeepSeek-OCR",
+                    "prompt_used": prompt,
+                    "items_found": len(parsed_data["menuItems"]),
+                    "cached": False,
+                    "upload_method": "binary"
+                }
+            }
+
+            # Cache the result
+            cache_result(image_hash, response_data)
+            logger.info(f"Cached result for uploaded image {image_hash[:8]}...")
+
+            return OCRResponse(**response_data)
+
+        finally:
+            # Clean up temporary file
+            if os.path.exists(tmp_file_path):
+                os.unlink(tmp_file_path)
 
     except Exception as e:
         logger.error(f"Error during file upload OCR: {e}")

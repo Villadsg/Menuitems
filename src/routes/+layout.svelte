@@ -1,19 +1,13 @@
 <script lang="ts">
     import '../app.css'; // Import Tailwind CSS
-    import { user, checkUser } from '$lib/userStore';
     import { onMount } from 'svelte';
-    import { SupabaseService } from '$lib/supabaseService';
-	  import { goto } from '$app/navigation';
     import "mapbox-gl/dist/mapbox-gl.css";
     import { toasts } from '$lib/stores/toastStore';
     import ToastContainer from '$lib/components/ToastContainer.svelte';
-    import { fly, fade } from 'svelte/transition';
+    import { fly } from 'svelte/transition';
     import { initializeMenuLearning } from '$lib/initMenuLearning';
 
     onMount(async () => {
-      // Check user authentication
-      checkUser();
-      
       // Initialize menu learning system
       try {
         await initializeMenuLearning();
@@ -22,18 +16,6 @@
         console.error('Error initializing menu learning system:', error?.message || String(error));
       }
     });
-  
-    const logout = async () => {
-      try {
-        await SupabaseService.logout(); // Log out the current session
-        user.set(null); // Set user to null after logging out
-        toasts.success('Logged out successfully');
-        goto("/logout")
-      } catch (error) {
-        console.error('Logout failed:', error.message);
-        toasts.error('Logout failed: ' + error.message);
-      }
-    };
 
     let isMenuOpen = false;
     const toggleMenu = () => isMenuOpen = !isMenuOpen;
@@ -57,25 +39,8 @@
         </a>
         
         <nav class="hidden md:flex items-center space-x-8">
-          {#if $user}
-            <a href="/create-quiz" class="text-sm text-stone-600 hover:text-stone-800 transition-colors font-medium tracking-wide">Add menu items</a>
-            <a href="/find-quiz" class="text-sm text-stone-600 hover:text-stone-800 transition-colors font-medium tracking-wide">Find menu items</a>
-            <a href="/profile" class="text-sm text-stone-600 hover:text-stone-800 transition-colors font-medium tracking-wide">Profile</a>
-            <button 
-              on:click={logout} 
-              class="bg-stone-200 hover:bg-orange-500 py-2.5 px-6 rounded-xl transition-all duration-200 font-medium text-sm tracking-wide"
-            >
-              Logout
-            </button>
-          {:else}
-            <a href="/login" class="text-sm text-stone-600 hover:text-stone-800 transition-colors font-medium tracking-wide">Login</a>
-            <a 
-              href="/signup" 
-              class="bg-stone-200 hover:bg-orange-500 py-2.5 px-6 rounded-xl transition-all duration-200 font-medium text-sm tracking-wide"
-            >
-              Sign Up
-            </a>
-          {/if}
+          <a href="/create-quiz" class="text-sm text-stone-600 hover:text-stone-800 transition-colors font-medium tracking-wide">Add</a>
+          <a href="/find-quiz" class="text-sm text-stone-600 hover:text-stone-800 transition-colors font-medium tracking-wide">Find</a>
         </nav>
         
         <!-- Mobile menu button -->
@@ -94,55 +59,25 @@
     
     <!-- Mobile menu -->
     {#if isMenuOpen}
-      <div 
+      <div
         transition:fly={{ y: -20, duration: 200 }}
         class="md:hidden bg-white/95 backdrop-blur-sm border-t border-gray-100/50"
       >
         <div class="container mx-auto px-6 py-4 space-y-2">
-          {#if $user}
-            <a 
-              href="/create-quiz" 
-              class="block py-3 px-4 text-sm text-stone-600 hover:text-stone-800 hover:bg-stone-50 rounded-xl font-medium tracking-wide transition-colors"
-              on:click={closeMenu}
-            >
-              Add menu items
-            </a>
-            <a 
-              href="/find-quiz" 
-              class="block py-3 px-4 text-sm text-stone-600 hover:text-stone-800 hover:bg-stone-50 rounded-xl font-medium tracking-wide transition-colors"
-              on:click={closeMenu}
-            >
-              Find menu items
-            </a>
-            <a 
-              href="/profile" 
-              class="block py-3 px-4 text-sm text-stone-600 hover:text-stone-800 hover:bg-stone-50 rounded-xl font-medium tracking-wide transition-colors"
-              on:click={closeMenu}
-            >
-              Profile
-            </a>
-            <button 
-              on:click={() => { closeMenu(); logout(); }}
-              class="w-full text-left py-3 px-4 text-sm bg-orange-400 text-white rounded-xl font-medium tracking-wide mt-4"
-            >
-              Logout
-            </button>
-          {:else}
-            <a 
-              href="/login" 
-              class="block py-3 px-4 bg-stone-100 text-sm hover:text-stone-800 hover:bg-stone-50 rounded-xl font-medium tracking-wide transition-colors"
-              on:click={closeMenu}
-            >
-              Login
-            </a>
-            <a 
-              href="/signup" 
-              class="block bg-stone-100 py-3 px-4 text-sm rounded-xl font-medium tracking-wide mt-4"
-              on:click={closeMenu}
-            >
-              Sign Up
-            </a>
-          {/if}
+          <a
+            href="/create-quiz"
+            class="block py-3 px-4 text-sm text-stone-600 hover:text-stone-800 hover:bg-stone-50 rounded-xl font-medium tracking-wide transition-colors"
+            on:click={closeMenu}
+          >
+            Add
+          </a>
+          <a
+            href="/find-quiz"
+            class="block py-3 px-4 text-sm text-stone-600 hover:text-stone-800 hover:bg-stone-50 rounded-xl font-medium tracking-wide transition-colors"
+            on:click={closeMenu}
+          >
+            Find
+          </a>
         </div>
       </div>
     {/if}

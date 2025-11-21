@@ -1,7 +1,7 @@
 <script lang="ts">
   import { getCurrentLocation, calculateDistance } from '$lib/location'; // Import location utilities
   import { goto } from '$app/navigation';
-  import { supabase } from '$lib/supabase'; 
+  import { DatabaseService } from '$lib/database'; 
   import DistanceCheck from '$lib/distanceCheck.svelte'; // Import the DistanceCheck component
 
   let language = 'english'; // Default language

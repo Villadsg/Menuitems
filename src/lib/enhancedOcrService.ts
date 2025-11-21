@@ -1,6 +1,6 @@
 import { OCRService, type MenuOCRResult } from './ocrService';
 import { locationSearchService, type LocationResult, type LocationSearchParams } from './locationSearchService';
-import { supabase } from './supabase';
+import { DatabaseService } from './database';
 
 export interface EnhancedMenuResult extends MenuOCRResult {
   locationData?: LocationResult;
@@ -179,49 +179,35 @@ export class EnhancedOCRService {
       
       if (locationResult) {
         // Update the restaurant record in the database
-        const { error } = await supabase
-          .from('restaurants')
-          .update({
-            lat: locationResult.latitude,
-            lng: locationResult.longitude,
-            location_data: locationResult,
-            location_search_status: 'found',
-            location_updated_at: new Date().toISOString()
-          })
-          .eq('id', restaurantId);
-
-        if (error) {
-          console.error('Failed to update restaurant location:', error);
-          return null;
-        }
+        await DatabaseService.updateDocument('restaurants', restaurantId, {
+          lat: locationResult.latitude,
+          lng: locationResult.longitude,
+          location_data: JSON.stringify(locationResult),
+          location_search_status: 'found',
+          location_updated_at: new Date().toISOString()
+        });
 
         console.log(`Updated restaurant ${restaurantId} with location data`);
         return locationResult;
       }
 
       // Update status even if not found
-      await supabase
-        .from('restaurants')
-        .update({
-          location_search_status: 'not_found',
-          location_updated_at: new Date().toISOString()
-        })
-        .eq('id', restaurantId);
+      await DatabaseService.updateDocument('restaurants', restaurantId, {
+        location_search_status: 'not_found',
+        location_updated_at: new Date().toISOString()
+      });
 
       return null;
       
     } catch (error) {
       console.error('Location update failed:', error);
-      
+
       // Update status to error
-      await supabase
-        .from('restaurants')
-        .update({
-          location_search_status: 'error',
-          location_updated_at: new Date().toISOString()
-        })
-        .eq('id', restaurantId);
-        
+      await DatabaseService.updateDocument('restaurants', restaurantId, {
+        location_search_status: 'error',
+        location_updated_at: new Date().toISOString()
+      });
+
       return null;
     }
   }
@@ -249,30 +235,27 @@ export class EnhancedOCRService {
     
     const limit = options.limit || 50;
     const onlyMissingCoordinates = options.onlyMissingCoordinates || true;
-    
+
     // Find restaurants that need location data
-    let query = supabase
-      .from('restaurants')
+    let queryBuilder = DatabaseService.from('restaurants')
       .select('id, route_name, ocrdata, lat, lng, location_search_status')
-      .not('route_name', 'is', null)
-      .limit(limit);
+      .isNotNull('route_name');
 
     if (onlyMissingCoordinates) {
-      query = query.or('lat.is.null,lng.is.null,location_search_status.is.null');
+      queryBuilder = queryBuilder.or('lat.is.null,lng.is.null,location_search_status.is.null');
     }
 
-    const { data: restaurants, error } = await query;
+    const restaurants = await queryBuilder.execute();
 
-    if (error) {
-      throw new Error(`Failed to fetch restaurants: ${error.message}`);
-    }
+    // Apply limit
+    const limitedRestaurants = restaurants.slice(0, limit);
 
     const results = [];
     let processed = 0;
     let successful = 0;
     let failed = 0;
 
-    for (const restaurant of restaurants || []) {
+    for (const restaurant of limitedRestaurants || []) {
       try {
         const restaurantName = restaurant.route_name || 
           (restaurant.ocrdata?.restaurantName) || 
@@ -309,7 +292,7 @@ export class EnhancedOCRService {
       }
 
       processed++;
-      options.onProgress?.(processed, restaurants.length);
+      options.onProgress?.(processed, limitedRestaurants.length);
 
       // Rate limiting - small delay between requests
       await new Promise(resolve => setTimeout(resolve, 500));
@@ -327,18 +310,17 @@ export class EnhancedOCRService {
    * Extract coordinates from image EXIF data
    */
   private static async extractExifCoordinates(
-    imageFileId: string, 
+    imageFileId: string,
     bucketId: string
   ): Promise<{ latitude: number; longitude: number } | null> {
-    
+
     try {
-      // This would need the exifr library that's already in your dependencies
-      const { data } = supabase.storage.from(bucketId).getPublicUrl(imageFileId);
-      const imageUrl = data.publicUrl;
-      
+      // Get local file URL
+      const imageUrl = `/data/photos/${imageFileId}`;
+
       // Import exifr dynamically to avoid SSR issues
       const { default: exifr } = await import('exifr');
-      
+
       const exifData = await exifr.parse(imageUrl, {
         gps: true,
         pick: ['latitude', 'longitude']
@@ -352,8 +334,8 @@ export class EnhancedOCRService {
       }
 
       return null;
-      
-    } catch (error) {
+
+    } catch (error: any) {
       console.log('EXIF extraction failed (this is normal for most images):', error.message);
       return null;
     }

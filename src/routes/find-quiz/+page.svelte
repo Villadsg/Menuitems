@@ -2,7 +2,7 @@
 
 <script lang="ts">
   import { getCurrentLocation, calculateDistance } from '$lib/location'; // Import location utilities
-  import { supabase } from '$lib/supabase'; // Import the initialized Supabase client
+  import { DatabaseService } from '$lib/database';
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { slide } from 'svelte/transition';

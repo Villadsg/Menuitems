@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { supabase } from '$lib/supabase';
+  import { DatabaseService } from '$lib/database';
   import { user } from '$lib/userStore';
   import { onMount } from 'svelte';
   import { compressImage } from '$lib/compress'; // Import the compress function

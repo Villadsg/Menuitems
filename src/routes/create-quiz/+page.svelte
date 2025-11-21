@@ -1,7 +1,6 @@
 <script lang="ts">
-  import { SupabaseService } from '$lib/supabaseService';
+  import { DatabaseService } from '$lib/database';
   import { goto } from '$app/navigation';
-  import { user } from '$lib/userStore';
   import { fly, fade } from 'svelte/transition';
   import { getCurrentLocation } from '$lib/location';
   import exifr from 'exifr'; // Import exifr for EXIF data extraction
@@ -64,7 +63,7 @@
   const tableName = 'restaurants';
   
   let currentPage = 'beginSection';
-  $: userId = $user?.id || 'anonymous';
+  const userId = 'local-user';
 
   /** Function to extract coordinates from EXIF metadata */
   const extractPhotoCoordinates = async (file: File) => {
@@ -140,23 +139,16 @@
       ocrResult = null;
    
       
-      // For anonymous users, process image directly without uploading to storage
-      if (!$user) {
-        // Process the image with OCR directly using base64
-        const fileToProcess = compressedFile || filesMainPhoto?.[0];
-        ocrResult = await OCRService.processImageDirectly(fileToProcess);
-      } else {
-        // For authenticated users, upload the file and process via storage
-        const fileToUpload = compressedFile || filesMainPhoto?.[0];
-        
-        const uploadResponse = await SupabaseService.uploadFile(fileToUpload, bucketId);
-        
-        // Store the file ID for feedback collection
-        photoFileId = uploadResponse.path;
-        
-        // Process the image with OCR
-        ocrResult = await OCRService.processMenuImage(uploadResponse.path, bucketId);
-      }
+      // Upload the file and process via storage
+      const fileToUpload = compressedFile || filesMainPhoto?.[0];
+
+      const uploadResponse = await DatabaseService.uploadFile(fileToUpload, bucketId);
+
+      // Store the file ID for feedback collection
+      photoFileId = uploadResponse.path;
+
+      // Process the image with OCR
+      ocrResult = await OCRService.processMenuImage(uploadResponse.path, bucketId);
       
       // Initialize editable menu items with the OCR results
       if (ocrResult && ocrResult.menuItems) {
@@ -286,28 +278,23 @@
         menuItems: updatedMenuItems
       };
       
-      // Store the feedback for learning purposes (only for authenticated users)
-      if ($user) {
-        try {
-          // Create a feedback document with original and corrected data
-          await SupabaseService.createDocument('menu_ocr_feedback', {
-            original_items: JSON.stringify(originalMenuItems),
-            corrected_items: JSON.stringify(editableMenuItems),
-            raw_text: ocrResult.rawText,
-            restaurant_name: routeName,
-            image_id: photoFileId || '',
-            user_id: userId,
-            timestamp: new Date().toISOString(),
-            menu_structure: ocrResult.enhancedStructure ? JSON.stringify(ocrResult.enhancedStructure) : null
-          });
-          toasts.success("Menu items updated successfully. Your edits will help improve future menu recognition");
-        } catch (error) {
-          console.error('Failed to save menu OCR feedback:', error);
-          // Still update the UI even if feedback saving fails
-          toasts.success("Menu items updated successfully");
-        }
-      } else {
-        // For anonymous users, just show success message
+      // Store the feedback for learning purposes
+      try {
+        // Create a feedback document with original and corrected data
+        await DatabaseService.createDocument('menu_ocr_feedback', {
+          original_items: JSON.stringify(originalMenuItems),
+          corrected_items: JSON.stringify(editableMenuItems),
+          raw_text: ocrResult.rawText,
+          restaurant_name: routeName,
+          image_id: photoFileId || '',
+          user_id: userId,
+          timestamp: new Date().toISOString(),
+          menu_structure: ocrResult.enhancedStructure ? JSON.stringify(ocrResult.enhancedStructure) : null
+        });
+        toasts.success("Menu items updated successfully. Your edits will help improve future menu recognition");
+      } catch (error) {
+        console.error('Failed to save menu OCR feedback:', error);
+        // Still update the UI even if feedback saving fails
         toasts.success("Menu items updated successfully");
       }
       
@@ -334,7 +321,7 @@
 
     try {
       // Upload the file to Supabase Storage
-      const response = await SupabaseService.uploadFile(fileToUpload, bucketId);
+      const response = await DatabaseService.uploadFile(fileToUpload, bucketId);
       return response.path;
     } catch (error) {
       console.error('Error uploading file:', error);
@@ -427,19 +414,13 @@
       }
       
       loading = true;
-      
-      // For anonymous users, we don't upload the photo to storage
-      let mainPhotoFileId = null;
-      if ($user) {
-        mainPhotoFileId = await uploadMainPhoto();
-        if (!mainPhotoFileId) {
-          toasts.error('Failed to upload photo');
-          loading = false;
-          return;
-        }
-      } else {
-        // For anonymous users, we just use a placeholder or the file name
-        mainPhotoFileId = `anonymous_upload_${Date.now()}`;
+
+      // Upload the photo to storage
+      let mainPhotoFileId = await uploadMainPhoto();
+      if (!mainPhotoFileId) {
+        toasts.error('Failed to upload photo');
+        loading = false;
+        return;
       }
       
       // Create the document in the database
@@ -466,7 +447,7 @@
         documentData.ocrdata = JSON.stringify(structuredMenuItems);
       }
       
-      const response = await SupabaseService.createDocument(tableName, documentData);
+      const response = await DatabaseService.createDocument(tableName, documentData);
 
       toasts.success('Menu uploaded successfully!');
       

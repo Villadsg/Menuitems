@@ -1,7 +1,6 @@
 <script lang="ts">
   import { fly } from 'svelte/transition';
-  import { supabase } from '$lib/supabase';
-  import { SupabaseService } from '$lib/supabaseService';
+  import { DatabaseService } from '$lib/database';
   import { page } from '$app/stores';
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
@@ -100,11 +99,6 @@
   }
 
   async function submitQuiz() {
-    if (!isLoggedIn) {
-      alert("Please log in to submit your quiz.");
-      goto('/login');
-      return;
-    }
 
     try {
       const userDoc = await databases.getDocument(databaseId, userCollectionId, userId);

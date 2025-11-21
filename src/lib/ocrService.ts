@@ -1,5 +1,4 @@
-import { supabase } from './supabase';
-import { SupabaseService } from './supabaseService';
+import { DatabaseService } from './database';
 import { applyMenuCorrections } from './menuCorrections';
 import { applyLearnedMenuCorrections, initializeMenuLearningSystem } from './menuLearningSystem';
 
@@ -36,6 +35,7 @@ export class OCRService {
 
   /**
    * Process image directly from File object (for anonymous users)
+   * Uses optimized binary upload instead of base64 encoding
    * @param file The image file to process
    * @returns Processed menu text data
    */
@@ -43,25 +43,14 @@ export class OCRService {
     try {
       const config = this.getConfig();
 
-      // Convert file to base64
-      const arrayBuffer = await file.arrayBuffer();
-      const uint8Array = new Uint8Array(arrayBuffer);
-      const base64String = btoa(String.fromCharCode(...uint8Array));
+      // Use FormData for binary upload (more efficient than base64)
+      const formData = new FormData();
+      formData.append('file', file);
 
-      // Call DeepSeek-OCR service
-      const response = await fetch(`${config.baseUrl}/api/generate`, {
+      // Call optimized binary upload endpoint
+      const response = await fetch(`${config.baseUrl}/api/ocr/upload`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          image: base64String,
-          prompt: this.OCR_PROMPT,
-          base_size: this.OCR_BASE_SIZE,
-          image_size: this.OCR_IMAGE_SIZE,
-          crop_mode: true,
-          test_compress: true
-        }),
+        body: formData
       });
 
       if (!response.ok) {
@@ -144,39 +133,28 @@ export class OCRService {
   }
   
   /**
+   * Get appropriate image URL from local file storage
+   * @param imageFileId The file ID in storage
+   * @param bucketId The bucket name
+   * @returns Image URL (local file path)
+   */
+  private static async getImageUrl(imageFileId: string, bucketId: string): Promise<string> {
+    // Return local file path
+    return `/data/photos/${imageFileId}`;
+  }
+
+  /**
    * Process an image with OCR to extract menu text using DeepSeek-OCR
-   * @param imageFileId The Supabase storage file ID
-   * @param bucketId The Supabase storage bucket ID
+   * @param imageFileId The local storage file ID
+   * @param bucketId The storage bucket ID
    * @returns Processed menu text data
    */
   static async processMenuImage(imageFileId: string, bucketId: string = 'photos'): Promise<MenuOCRResult> {
     try {
       const config = this.getConfig();
-      
-      // Try to get a signed URL first (for private buckets), fallback to public URL
-      let fileUrl = '';
-      
-      try {
-        // Try signed URL first (expires in 1 hour)
-        const { data: signedUrlData, error: signedError } = await supabase.storage
-          .from(bucketId)
-          .createSignedUrl(imageFileId, 3600);
-        
-        if (signedError || !signedUrlData?.signedUrl) {
-          console.log('Signed URL failed, trying public URL...');
-          // Fallback to public URL
-          const { data: urlData } = supabase.storage.from(bucketId).getPublicUrl(imageFileId);
-          fileUrl = urlData.publicUrl;
-        } else {
-          fileUrl = signedUrlData.signedUrl;
-          console.log('Using signed URL');
-        }
-      } catch (error) {
-        console.log('Error getting signed URL, using public URL:', error);
-        // Fallback to public URL
-        const { data: urlData } = supabase.storage.from(bucketId).getPublicUrl(imageFileId);
-        fileUrl = urlData.publicUrl;
-      }
+
+      // Get image URL with optimized logic
+      let fileUrl = await this.getImageUrl(imageFileId, bucketId);
       
       // Add a timestamp to avoid caching issues (only if not already a signed URL)
       let finalUrl = fileUrl;
@@ -186,8 +164,8 @@ export class OCRService {
         finalUrl = `${fileUrl}${separator}timestamp=${timestamp}`;
       }
       
-      // Convert image URL to base64 for DeepSeek-OCR
-      let imageBase64 = '';
+      // Fetch image and prepare for binary upload
+      let imageBlob: Blob;
 
       try {
         const imageResponse = await fetch(finalUrl);
@@ -197,34 +175,21 @@ export class OCRService {
           throw new Error(`Failed to fetch image: ${imageResponse.status} ${imageResponse.statusText}`);
         }
 
-        const imageBlob = await imageResponse.blob();
+        imageBlob = await imageResponse.blob();
         console.log('Image processed, size:', imageBlob.size, 'bytes');
-
-        const arrayBuffer = await imageBlob.arrayBuffer();
-        const uint8Array = new Uint8Array(arrayBuffer);
-
-        // Convert to base64
-        const base64String = btoa(String.fromCharCode(...uint8Array));
-        imageBase64 = base64String;
       } catch (imageError) {
-        console.error('Error processing image:', imageError.message);
-        throw new Error(`Failed to process image: ${imageError.message}`);
+        console.error('Error processing image:', imageError instanceof Error ? imageError.message : 'Unknown error');
+        throw new Error(`Failed to process image: ${imageError instanceof Error ? imageError.message : 'Unknown error'}`);
       }
 
-      // Call DeepSeek-OCR for menu extraction
-      const response = await fetch(`${config.baseUrl}/api/generate`, {
+      // Use FormData for optimized binary upload
+      const formData = new FormData();
+      formData.append('file', imageBlob, 'menu.jpg');
+
+      // Call optimized binary upload endpoint
+      const response = await fetch(`${config.baseUrl}/api/ocr/upload`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          image: imageBase64,
-          prompt: this.OCR_PROMPT,
-          base_size: this.OCR_BASE_SIZE,
-          image_size: this.OCR_IMAGE_SIZE,
-          crop_mode: true,
-          test_compress: true
-        }),
+        body: formData
       });
 
       if (!response.ok) {
@@ -427,36 +392,36 @@ export class OCRService {
   }
   
   /**
-   * Save OCR results to Supabase database
+   * Save OCR results to local database
    * @param menuId The ID of the menu document
    * @param ocrResult The OCR processing result
-   * @param tableName The Supabase table name for menu documents
+   * @param tableName The database table name for menu documents
    */
   static async saveOCRResults(menuId: string, ocrResult: MenuOCRResult, tableName: string): Promise<void> {
     try {
       // Create a structured and separable format for menu items
       const structuredMenuItems = this.createStructuredMenuItems(ocrResult.menuItems);
-      
+
       // First, save the raw text, enhanced structure, and structured menu items to the menu document
       const updateData: any = {
         ocr_raw_text: ocrResult.rawText,
         ocr_processed: true,
         ocrdata: JSON.stringify(structuredMenuItems) // Store structured menu items in ocrdata field
       };
-      
+
       // Add enhanced structure if available
       if (ocrResult.enhancedStructure) {
         updateData.ocr_enhanced_structure = JSON.stringify(ocrResult.enhancedStructure);
       }
 
-      await SupabaseService.updateDocument(tableName, menuId, updateData);
-      
+      await DatabaseService.updateDocument(tableName, menuId, updateData);
+
       // Then save each menu item to a separate table for individual access
       for (const item of ocrResult.menuItems) {
         // Skip category entries (they don't have a price)
         if (!item.name || item.name === item.category) continue;
-        
-        await SupabaseService.createDocument('menu_items', {
+
+        await DatabaseService.createDocument('menu_items', {
           menu_id: menuId,
           name: item.name,
           description: item.description || '',
