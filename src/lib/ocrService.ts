@@ -1,6 +1,7 @@
 import { DatabaseService } from './database';
 import { applyMenuCorrections } from './menuCorrections';
 import { applyLearnedMenuCorrections, initializeMenuLearningSystem } from './menuLearningSystem';
+import ApiConfig from './apiConfig';
 
 export interface MenuOCRResult {
   menuItems: {
@@ -17,7 +18,6 @@ export interface MenuOCRResult {
 
 export class OCRService {
   // Configuration constants
-  private static readonly OCR_BASE_URL = 'http://localhost:8000';
   private static readonly OCR_TIMEOUT = 60000;
   private static readonly OCR_BASE_SIZE = 1024;
   private static readonly OCR_IMAGE_SIZE = 640;
@@ -27,10 +27,28 @@ export class OCRService {
   private static readonly MIN_TEXT_LENGTH = 20;
   private static readonly MIN_LINES_FOR_MENU = 3;
 
+  /**
+   * Get OCR base URL based on platform
+   * Web: localhost:8000
+   * Mobile: Desktop server IP with port 8000
+   */
+  private static async getOCRBaseUrl(): Promise<string> {
+    if (ApiConfig.isMobile()) {
+      // Mobile: OCR runs on desktop server
+      const serverUrl = await ApiConfig.getBaseUrl();
+      // Extract hostname and use port 8000
+      const url = new URL(serverUrl);
+      return `${url.protocol}//${url.hostname}:8000`;
+    } else {
+      // Web: OCR runs locally
+      return 'http://localhost:8000';
+    }
+  }
+
   // Default configuration for DeepSeek-OCR service
   private static defaultConfig = {
-    baseUrl: this.OCR_BASE_URL,
-    timeout: this.OCR_TIMEOUT
+    timeout: this.OCR_TIMEOUT,
+    baseUrl: 'http://localhost:8000'
   };
 
   /**
@@ -41,14 +59,14 @@ export class OCRService {
    */
   static async processImageDirectly(file: File): Promise<MenuOCRResult> {
     try {
-      const config = this.getConfig();
+      const ocrBaseUrl = await this.getOCRBaseUrl();
 
       // Use FormData for binary upload (more efficient than base64)
       const formData = new FormData();
       formData.append('file', file);
 
       // Call optimized binary upload endpoint
-      const response = await fetch(`${config.baseUrl}/api/ocr/upload`, {
+      const response = await fetch(`${ocrBaseUrl}/api/ocr/upload`, {
         method: 'POST',
         body: formData
       });
@@ -131,7 +149,7 @@ export class OCRService {
 
     return customConfig;
   }
-  
+
   /**
    * Get appropriate image URL from local file storage
    * @param imageFileId The file ID in storage
@@ -155,7 +173,7 @@ export class OCRService {
 
       // Get image URL with optimized logic
       let fileUrl = await this.getImageUrl(imageFileId, bucketId);
-      
+
       // Add a timestamp to avoid caching issues (only if not already a signed URL)
       let finalUrl = fileUrl;
       if (!fileUrl.includes('token=')) {
@@ -163,7 +181,7 @@ export class OCRService {
         const separator = fileUrl.includes('?') ? '&' : '?';
         finalUrl = `${fileUrl}${separator}timestamp=${timestamp}`;
       }
-      
+
       // Fetch image and prepare for binary upload
       let imageBlob: Blob;
 
@@ -186,8 +204,11 @@ export class OCRService {
       const formData = new FormData();
       formData.append('file', imageBlob, 'menu.jpg');
 
+      // Get OCR base URL
+      const ocrBaseUrl = await this.getOCRBaseUrl();
+
       // Call optimized binary upload endpoint
-      const response = await fetch(`${config.baseUrl}/api/ocr/upload`, {
+      const response = await fetch(`${ocrBaseUrl}/api/ocr/upload`, {
         method: 'POST',
         body: formData
       });
@@ -200,7 +221,7 @@ export class OCRService {
 
       const data = await response.json();
       console.log('OCR extraction completed, items found:', data.menuItems?.length || 0);
-      
+
       // Extract the response from DeepSeek-OCR
       // The response should already be structured based on our FastAPI service
       let rawText = '';
@@ -223,18 +244,18 @@ export class OCRService {
         rawText = data.rawText || JSON.stringify(data);
         menuItems = this.processMenuText(rawText);
       }
-      
+
       // Check if there's enough text to process
       if (!rawText || rawText.trim().length < this.MIN_TEXT_LENGTH) {
         console.warn('Insufficient text detected in the image. Cannot extract menu items.');
         throw new Error('No menu text detected in the image. Please try with a clearer menu photo.');
       }
-      
+
       // If no items were extracted at all, throw an error
       if (menuItems.length === 0) {
         throw new Error('No content could be extracted from the image. Please try with a clearer photo.');
       }
-      
+
       // Extract restaurant name
       let restaurantName = "Unknown Restaurant";
 
@@ -282,7 +303,7 @@ export class OCRService {
 
       // Create a more user-friendly error message
       let userMessage = 'Failed to process menu image';
-      
+
       // Type guard to check if error is an Error object with a message property
       if (error instanceof Error) {
         if (error.message.includes('timeout') || error.message.includes('timed out')) {
@@ -293,13 +314,13 @@ export class OCRService {
           userMessage = 'OCR service rate limit exceeded. Please try again in a few minutes.';
         } else if (error.message.includes('Failed to parse error response')) {
           userMessage = 'The OCR service is currently experiencing issues. Please try again later.';
-        } else if (error.message.includes('service is temporarily unavailable') || 
-                  error.message.includes('status code 503') || 
-                  error.message.includes('unavailable')) {
+        } else if (error.message.includes('service is temporarily unavailable') ||
+          error.message.includes('status code 503') ||
+          error.message.includes('unavailable')) {
           userMessage = 'The OCR service is temporarily unavailable. Please try again later.';
         }
       }
-      
+
       // Create a structured error with additional context
       const enhancedError = new Error(userMessage);
       // Use type assertion for cause property
@@ -307,11 +328,11 @@ export class OCRService {
       if (error instanceof Error) {
         (enhancedError as any).originalMessage = error.message;
       }
-      
+
       throw enhancedError;
     }
   }
-  
+
   /**
    * Process raw OCR text into structured menu items
    * @param text Raw OCR text
@@ -331,15 +352,15 @@ export class OCRService {
       console.log('Too few lines for menu item extraction');
       return [];
     }
-    
+
     const menuItems: MenuOCRResult['menuItems'] = [];
     let currentCategory = 'Uncategorized';
     let priceCount = 0;
-    
+
     for (const line of lines) {
       // Look for price patterns (e.g., $12.99)
       const priceMatch = line.match(/\$\d+\.\d{2}|\d+\.\d{2}€|\d+\.\d{2}/);
-      
+
       // Check if line is all caps or ends with a colon - likely a category
       if (line.match(/^[A-Z\s]+$/) || line.endsWith(':')) {
         currentCategory = line.trim().replace(/:$/, '');
@@ -353,7 +374,7 @@ export class OCRService {
         const priceIndex = priceMatch.index || 0; // Default to 0 if undefined
         const name = line.substring(0, priceIndex).trim();
         const description = line.substring(priceIndex + price.length).trim();
-        
+
         menuItems.push({
           name,
           price,
@@ -369,14 +390,14 @@ export class OCRService {
         });
       }
     }
-    
+
     // If we didn't find any prices and there are more than 10 lines,
     // this probably isn't a menu. In this case, just create items from the lines
     // without trying to categorize them.
     if (priceCount === 0 && lines.length > 10) {
       console.log('No prices found in text, treating as plain text');
       menuItems.length = 0; // Clear the array
-      
+
       // Just create one item per line, with the actual text
       for (const line of lines) {
         if (line.trim()) {
@@ -387,10 +408,10 @@ export class OCRService {
         }
       }
     }
-    
+
     return menuItems;
   }
-  
+
   /**
    * Save OCR results to local database
    * @param menuId The ID of the menu document
@@ -434,7 +455,7 @@ export class OCRService {
       throw error;
     }
   }
-  
+
 
   /**
    * Attempt to extract a restaurant name from raw OCR text using heuristics
@@ -443,67 +464,67 @@ export class OCRService {
    */
   private static extractRestaurantNameFromRawText(rawText: string): string | null {
     if (!rawText || rawText.length < 5) return null;
-    
+
     // Split the text into lines and clean them
     const lines = rawText.split('\n')
       .map(line => line.trim())
       .filter(line => line.length > 0);
-    
+
     if (lines.length === 0) return null;
-    
+
     // Common menu section names to avoid mistaking for restaurant names
     const commonSectionNames = [
-      'menu', 'appetizers', 'starters', 'entrees', 'main', 'mains', 'desserts', 
+      'menu', 'appetizers', 'starters', 'entrees', 'main', 'mains', 'desserts',
       'drinks', 'beverages', 'sides', 'lunch', 'dinner', 'breakfast', 'brunch',
       'specials', 'special', 'daily', 'soup', 'salad', 'pasta', 'pizza', 'wine',
       'beer', 'cocktails', 'kids', 'children', 'takeout', 'take-out', 'to go',
       'vegetarian', 'vegan', 'gluten-free', 'allergens', 'snacks'
     ];
-    
+
     // Check the first few lines for potential restaurant names
     // Focus on the first 5 lines as restaurant names often appear at the top
     for (let i = 0; i < Math.min(5, lines.length); i++) {
       const line = lines[i];
-      
+
       // Skip very short lines or common section names
-      if (line.length < 3 || commonSectionNames.some(section => 
-          line.toLowerCase().includes(section))) {
+      if (line.length < 3 || commonSectionNames.some(section =>
+        line.toLowerCase().includes(section))) {
         continue;
       }
-      
+
       // Look for lines that might be restaurant names
       // 1. All caps or title case often indicates importance
       // 2. Contains words like Restaurant, Cafe, etc.
       // 3. Not too long (most restaurant names are reasonably short)
       if (
-        (line === line.toUpperCase() || 
-         (line[0] === line[0].toUpperCase() && line.length > 3)) && 
+        (line === line.toUpperCase() ||
+          (line[0] === line[0].toUpperCase() && line.length > 3)) &&
         line.length < 40 &&
         !line.includes('$') && // Avoid price lists
         !line.match(/^\d/) // Avoid lines starting with numbers
       ) {
         return line;
       }
-      
+
       // Check for lines containing restaurant-related words
-      const restaurantWords = ['restaurant', 'cafe', 'bistro', 'bar', 'grill', 
-                              'ristorante', 'trattoria', 'pizzeria', 'kitchen',
-                              'eatery', 'diner', 'steakhouse', 'pub', 'tavern'];
-      
+      const restaurantWords = ['restaurant', 'cafe', 'bistro', 'bar', 'grill',
+        'ristorante', 'trattoria', 'pizzeria', 'kitchen',
+        'eatery', 'diner', 'steakhouse', 'pub', 'tavern'];
+
       if (restaurantWords.some(word => line.toLowerCase().includes(word))) {
         return line;
       }
     }
-    
+
     // If we couldn't find anything in the first few lines, look for distinctive patterns
     // throughout the text that might indicate a restaurant name
-    
+
     // Look for lines with "est." or "established" which often appear with restaurant names
-    const establishedLine = lines.find(line => 
-      line.toLowerCase().includes('est.') || 
+    const establishedLine = lines.find(line =>
+      line.toLowerCase().includes('est.') ||
       line.toLowerCase().includes('established') ||
       line.toLowerCase().includes('since'));
-    
+
     if (establishedLine) {
       // Extract the part before "est." or "established"
       const parts = establishedLine.split(/est\.|established|since/i);
@@ -511,34 +532,34 @@ export class OCRService {
         return parts[0].trim();
       }
     }
-    
+
     // As a last resort, return the first line that's not a common menu section
     // and looks like it could be a name
     for (const line of lines) {
-      if (line.length > 3 && 
-          line.length < 40 && 
-          !commonSectionNames.some(section => line.toLowerCase() === section) &&
-          !line.includes('$') &&
-          !line.match(/^\d/)) {
+      if (line.length > 3 &&
+        line.length < 40 &&
+        !commonSectionNames.some(section => line.toLowerCase() === section) &&
+        !line.includes('$') &&
+        !line.match(/^\d/)) {
         return line;
       }
     }
-    
+
     return null;
   }
-  
+
   private static createStructuredMenuItems(menuItems: MenuOCRResult['menuItems']): any {
     // Group menu items by category
     const categorizedItems: Record<string, any[]> = {};
-    
+
     // First pass: identify all categories
     for (const item of menuItems) {
       const category = item.category || 'Uncategorized';
-      
+
       if (!categorizedItems[category]) {
         categorizedItems[category] = [];
       }
-      
+
       // Only add actual menu items (not category headers) to the items array
       if (item.name !== category) {
         categorizedItems[category].push({
@@ -549,7 +570,7 @@ export class OCRService {
         });
       }
     }
-    
+
     // Convert to array format for better structure
     const structuredMenu = {
       sections: Object.keys(categorizedItems).map(category => ({
@@ -562,7 +583,7 @@ export class OCRService {
         createdAt: new Date().toISOString()
       }
     };
-    
+
     return structuredMenu;
   }
 }

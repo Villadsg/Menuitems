@@ -3,11 +3,14 @@
  * Makes API calls to the server-side database API
  * Maintains the same interface as SupabaseService for easy migration
  */
+import ApiConfig from './apiConfig';
+
 export const DatabaseClient = {
 
   // Create a document in a specific table
   async createDocument(tableName: string, data: any) {
-    const response = await fetch('/api/db', {
+    const apiUrl = await ApiConfig.getApiUrl('/api/db');
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -23,7 +26,8 @@ export const DatabaseClient = {
 
   // Get a document by table and document ID
   async getDocument(tableName: string, documentId: string) {
-    const response = await fetch('/api/db', {
+    const apiUrl = await ApiConfig.getApiUrl('/api/db');
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -39,7 +43,8 @@ export const DatabaseClient = {
 
   // Get a user profile by user_id
   async getUserProfile(userId: string) {
-    const response = await fetch('/api/db', {
+    const apiUrl = await ApiConfig.getApiUrl('/api/db');
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -55,7 +60,8 @@ export const DatabaseClient = {
 
   // Update a document in a specific table
   async updateDocument(tableName: string, documentId: string, data: any) {
-    const response = await fetch('/api/db', {
+    const apiUrl = await ApiConfig.getApiUrl('/api/db');
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -71,7 +77,8 @@ export const DatabaseClient = {
 
   // Update a user profile by user_id
   async updateUserProfile(userId: string, data: any) {
-    const response = await fetch('/api/db', {
+    const apiUrl = await ApiConfig.getApiUrl('/api/db');
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -87,7 +94,8 @@ export const DatabaseClient = {
 
   // Upsert (insert or update) a user profile
   async upsertUserProfile(userId: string, data: any) {
-    const response = await fetch('/api/db', {
+    const apiUrl = await ApiConfig.getApiUrl('/api/db');
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -103,7 +111,8 @@ export const DatabaseClient = {
 
   // Delete a document by table and document ID
   async deleteDocument(tableName: string, documentId: string) {
-    const response = await fetch('/api/db', {
+    const apiUrl = await ApiConfig.getApiUrl('/api/db');
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -123,7 +132,8 @@ export const DatabaseClient = {
     formData.append('file', file);
     formData.append('bucket', bucket);
 
-    const response = await fetch('/api/files', {
+    const apiUrl = await ApiConfig.getApiUrl('/api/files');
+    const response = await fetch(apiUrl, {
       method: 'POST',
       body: formData
     });
@@ -135,7 +145,8 @@ export const DatabaseClient = {
 
   // Delete a file by its file path
   async deleteFile(filePath: string, bucket: string = 'photos') {
-    const response = await fetch('/api/files', {
+    const apiUrl = await ApiConfig.getApiUrl('/api/files');
+    const response = await fetch(apiUrl, {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ filePath, bucket })
@@ -190,7 +201,8 @@ export const DatabaseClient = {
       },
 
       async execute() {
-        const response = await fetch('/api/db', {
+        const apiUrl = await ApiConfig.getApiUrl('/api/db');
+        const response = await fetch(apiUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

@@ -9,6 +9,10 @@ services:
     environment:
       - CUDA_DEVICE=0
       - PORT=8000
+      - NVIDIA_VISIBLE_DEVICES=all
+    volumes:
+      - ./models:/root/.cache/huggingface # Cache downloaded models
+    restart: unless-stopped
     deploy:
       resources:
         reservations:
@@ -16,6 +20,3 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [gpu]
-    volumes:
-      - ./models:/root/.cache/huggingface  # Cache downloaded models
-    restart: unless-stopped

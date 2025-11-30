@@ -1,12 +1,11 @@
-torch==2.6.0
 transformers==4.46.3
 tokenizers==0.20.3
 einops
 addict
 easydict
-flash-attn==2.7.3
 fastapi==0.115.0
 uvicorn[standard]==0.32.0
 python-multipart==0.0.20
 pillow==11.0.0
 pydantic==2.10.3
+torchvision

@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { EnhancedOCRService } from '$lib/enhancedOcrService';
+import { DatabaseService } from '$lib/databaseService';
 
 export const POST: RequestHandler = async ({ request }) => {
   try {
@@ -28,24 +29,18 @@ export const POST: RequestHandler = async ({ request }) => {
 
     if (dryRun) {
       // For dry run, just return what would be processed without actually doing it
-      const { data: restaurants, error } = await import('$lib/supabase').then(m => m.supabase)
-        .from('restaurants')
+      const restaurants = await DatabaseService.from('restaurants')
         .select('id, route_name, ocrdata, lat, lng, location_search_status')
-        .not('route_name', 'is', null)
-        .limit(limit);
-
-      if (error) {
-        return json(
-          { error: 'Failed to fetch restaurants for dry run', details: error.message },
-          { status: 500 }
-        );
-      }
+        .isNotNull('route_name')
+        .execute();
 
       let filteredRestaurants = restaurants || [];
       if (onlyMissingCoordinates) {
-        filteredRestaurants = filteredRestaurants.filter(r => 
+        filteredRestaurants = filteredRestaurants.filter(r =>
           !r.lat || !r.lng || !r.location_search_status
-        );
+        ).slice(0, limit);
+      } else {
+        filteredRestaurants = filteredRestaurants.slice(0, limit);
       }
 
       return json({
@@ -89,30 +84,25 @@ export const POST: RequestHandler = async ({ request }) => {
 export const GET: RequestHandler = async ({ url }) => {
   try {
     const action = url.searchParams.get('action');
-    
+
     if (action === 'stats') {
       // Return statistics about restaurants and their location data
-      const { supabase } = await import('$lib/supabase');
-      
-      const [
-        { count: totalRestaurants },
-        { count: withCoordinates },
-        { count: withLocationSearch },
-        { count: missingLocation }
-      ] = await Promise.all([
-        supabase.from('restaurants').select('*', { count: 'exact', head: true }),
-        supabase.from('restaurants').select('*', { count: 'exact', head: true }).not('lat', 'is', null).not('lng', 'is', null),
-        supabase.from('restaurants').select('*', { count: 'exact', head: true }).eq('location_search_status', 'found'),
-        supabase.from('restaurants').select('*', { count: 'exact', head: true }).or('lat.is.null,lng.is.null,location_search_status.is.null')
-      ]);
+      const allRestaurants = await DatabaseService.from('restaurants')
+        .select('lat, lng, location_search_status')
+        .execute();
+
+      const totalRestaurants = allRestaurants.length;
+      const withCoordinates = allRestaurants.filter(r => r.lat && r.lng).length;
+      const withLocationSearch = allRestaurants.filter(r => r.location_search_status === 'found').length;
+      const missingLocation = allRestaurants.filter(r => !r.lat || !r.lng || !r.location_search_status).length;
 
       return json({
         success: true,
         stats: {
-          totalRestaurants: totalRestaurants || 0,
-          withCoordinates: withCoordinates || 0,
-          withLocationSearch: withLocationSearch || 0,
-          missingLocation: missingLocation || 0,
+          totalRestaurants,
+          withCoordinates,
+          withLocationSearch,
+          missingLocation,
           coordinatesPercentage: totalRestaurants ? Math.round((withCoordinates / totalRestaurants) * 100) : 0,
           locationSearchPercentage: totalRestaurants ? Math.round((withLocationSearch / totalRestaurants) * 100) : 0
         }
@@ -127,9 +117,9 @@ export const GET: RequestHandler = async ({ url }) => {
   } catch (error) {
     console.error('Backfill locations GET API error:', error);
     return json(
-      { 
-        error: 'Internal server error', 
-        details: process.env.NODE_ENV === 'development' ? error.message : undefined 
+      {
+        error: 'Internal server error',
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
       },
       { status: 500 }
     );

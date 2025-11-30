@@ -68,20 +68,40 @@ def load_model():
 
     logger.info("Loading DeepSeek-OCR model...")
 
-    # Set CUDA device
-    os.environ["CUDA_VISIBLE_DEVICES"] = os.getenv("CUDA_DEVICE", "0")
-
     model_name = 'deepseek-ai/DeepSeek-OCR'
+
+    # Force CPU mode due to RTX 5070 Ti (sm_120) not being supported by PyTorch yet
+    force_cpu = os.getenv("FORCE_CPU", "true").lower() == "true"
 
     try:
         tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
+
+        # Always use eager attention (no flash-attn dependency)
+        attn_impl = 'eager'
+        logger.info(f"Using attention implementation: {attn_impl}")
+
         model = AutoModel.from_pretrained(
             model_name,
-            _attn_implementation='flash_attention_2',
+            _attn_implementation=attn_impl,
             trust_remote_code=True,
             use_safetensors=True
         )
-        model = model.eval().cuda().to(torch.bfloat16)
+
+        if force_cpu:
+            model = model.eval().to(torch.float32)
+            logger.info("Model loaded on CPU (forced mode)")
+        elif torch.cuda.is_available():
+            try:
+                model = model.eval().cuda().to(torch.bfloat16)
+                logger.info("Model loaded on GPU with eager attention")
+            except RuntimeError as e:
+                logger.warning(f"Failed to load on GPU ({e}), falling back to CPU")
+                model = model.eval().to(torch.float32)
+                logger.info("Model loaded on CPU (GPU fallback)")
+        else:
+            model = model.eval().to(torch.float32)
+            logger.info("Model loaded on CPU (no GPU available)")
+
         logger.info("Model loaded successfully")
     except Exception as e:
         logger.error(f"Error loading model: {e}")
@@ -395,9 +415,67 @@ async def upload_ocr(file: UploadFile = File(...)):
     if model is None or tokenizer is None:
         raise HTTPException(status_code=503, detail="Model not loaded")
 
+    # Server-side file validation
+    MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
+    ALLOWED_CONTENT_TYPES = ['image/jpeg', 'image/png', 'image/webp']
+    MIN_FILE_SIZE = 1024  # 1KB minimum
+
+    # Validate content type
+    if file.content_type not in ALLOWED_CONTENT_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid file type: {file.content_type}. Only JPEG, PNG, and WebP images are allowed."
+        )
+
     try:
         # Read file content as bytes
         image_data = await file.read()
+
+        # Validate file size
+        file_size = len(image_data)
+        if file_size > MAX_FILE_SIZE:
+            raise HTTPException(
+                status_code=400,
+                detail=f"File size too large ({file_size / (1024 * 1024):.2f}MB). Maximum allowed size is 10MB."
+            )
+
+        if file_size < MIN_FILE_SIZE:
+            raise HTTPException(
+                status_code=400,
+                detail="File size too small. Please upload a valid image file."
+            )
+
+        # Verify it's actually a valid image using PIL
+        try:
+            img = Image.open(io.BytesIO(image_data))
+            img.verify()  # Verify it's a valid image
+
+            # Re-open for dimension checks (verify() closes the file)
+            img = Image.open(io.BytesIO(image_data))
+            width, height = img.size
+
+            # Check minimum dimensions (too small images are likely not menus)
+            if width < 100 or height < 100:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Image dimensions too small ({width}x{height}). Minimum 100x100 pixels required."
+                )
+
+            # Check maximum dimensions to prevent memory issues
+            MAX_DIMENSION = 10000
+            if width > MAX_DIMENSION or height > MAX_DIMENSION:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Image dimensions too large ({width}x{height}). Maximum {MAX_DIMENSION}x{MAX_DIMENSION} pixels."
+                )
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid or corrupted image file: {str(e)}"
+            )
 
         # Check cache first
         image_hash = compute_image_hash(image_data)

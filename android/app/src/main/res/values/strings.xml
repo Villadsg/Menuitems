@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">MenuMap</string>
+    <string name="title_activity_main">MenuMap</string>
+    <string name="package_name">com.menumap.app</string>
+    <string name="custom_url_scheme">com.menumap.app</string>
+</resources>

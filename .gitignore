@@ -22,3 +22,13 @@ vite.config.ts.timestamp-*
 
 # Local Netlify folder
 .netlify
+
+# Docker services and local infrastructure
+deepseek-ocr-service/
+data/
+*.duckdb*
+cloudflared-linux-amd64.deb
+ngrok*
+
+# Local scripts and development tools
+scripts/start_server.sh

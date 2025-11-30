@@ -7,7 +7,17 @@
       "Bash(rg:*)",
       "Bash(grep:*)",
       "Bash(sed:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "WebSearch",
+      "Bash(cloc:*)",
+      "Bash(find:*)",
+      "Bash(curl:*)",
+      "Bash(sudo gpg:*)",
+      "Bash(sudo tee:*)",
+      "Bash(docker compose:*)",
+      "Bash(python3:*)",
+      "Bash(docker logs:*)",
+      "Bash(chmod:*)"
     ],
     "deny": []
   }
