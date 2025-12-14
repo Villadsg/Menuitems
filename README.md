@@ -1,4 +1,4 @@
-# LangTours
+# MenuItems
 
 A web application for uploading and managing restaurant menus with OCR capabilities.
 
